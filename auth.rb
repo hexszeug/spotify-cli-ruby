@@ -70,10 +70,36 @@ module Auth
             code: code,
             redirect_uri: CALLBACK_URI
         }
-        token_res = Request.post TOKEN_REQUEST_URI, {}, req_token_header, req_token_body
-        puts token_res.body
+        token_res = Request.post TOKEN_REQUEST_URI, {}, req_token_header, req_token_body #TODO better error handling
+        token_json = (JSON.parse token_res.body).transform_keys &:to_sym
+        puts token_json
+        user = User.new token_json[:access_token], token_json[:expires_in], token_json[:refresh_token]
+        user.refresh_token
     end
-        
+    
+    class User
+        def initialize access_token, expires_in, refresh_token
+            @access_token = access_token
+            @expires_in = expires_in
+            @refresh_token = refresh_token
+        end
+
+        def refresh_token
+            header = {
+                authorization: BASIC_AUTH,
+                'content-type': 'application/x-www-form-urlencoded'
+            }
+            body = {
+                grant_type: 'refresh_token',
+                refresh_token: @refresh_token
+            }
+            res = Request.post TOKEN_REQUEST_URI, {}, header, body
+            res_json = (JSON.parse res.body).transform_keys &:to_sym
+            @access_token = res_json[:access_token]
+            @expires_in = res_json[:expires_in]
+            puts res_json
+        end
+    end
 end
 
 Auth.new_user
