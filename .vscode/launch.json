@@ -1,0 +1,11 @@
+{
+  "configurations": [
+    {
+      "name": "Run ruby task hack",
+      "program": "${file}",
+      "request": "launch",
+      "type": "Ruby",
+      "preLaunchTask": "run ruby"
+    }
+  ]
+}
