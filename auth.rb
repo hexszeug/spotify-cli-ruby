@@ -70,7 +70,7 @@ module Auth
             code: code,
             redirect_uri: CALLBACK_URI
         }
-        token_res = post TOKEN_REQUEST_URI, {}, req_token_header, req_token_body
+        token_res = Request.post TOKEN_REQUEST_URI, {}, req_token_header, req_token_body
         puts token_res.body
     end
         
