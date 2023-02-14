@@ -3,19 +3,19 @@ require 'net/http'
 module Request
     API = 'https://api.spotify.com/v1/'
 
-    def Request.get path, query, header
+    def Request.get path, query: {}, header: {}
         request Net::HTTP::Get, path, query, header
     end
 
-    def Request.post path, query, header, body
+    def Request.post path, query: {}, header: {}, body: {}
         request Net::HTTP::Post, path, query, header, body
     end
 
-    def Request.put path, query, header, body
+    def Request.put path, query: {}, header: {}, body: {}
         request Net::HTTP::Put, path, query, header, body
     end
 
-    def Request.delete path, query, header
+    def Request.delete path, query: {}, header: {}
         request Net::HTTP::Delete, path, query, header
     end
 
@@ -38,10 +38,7 @@ module Request
         puts
         puts res.code + ' ' + res.class.to_s.match(/^Net::HTTP(.*)$/)[1]
         res.each {|k, v| puts "#{k}: #{v}"}
-
-        unless res.class < Net::HTTPSuccess
-            raise res.code #TODO better error handling
-        end
-        res
+        
+        return res
     end
 end

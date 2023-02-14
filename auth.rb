@@ -7,7 +7,7 @@ require 'json'
 
 module Auth
     ID = '4388096316894b88a147b53559d0c14a'
-    SECRET = 'c769df8ae055480ea18b6405c0d60502'
+    SECRET = '77f2373853974699824602358ecdf9bd'
     SCOPE = ''
     HUMAN_AUTH_PROMPT_URI = 'https://accounts.spotify.com/authorize/'
     CALLBACK_PORT = 80
@@ -16,14 +16,13 @@ module Auth
     CALLBACK_SUCESS_URI = 'https://google.com'
     CALLBACK_SUCESS_RESPONSE = "HTTP/1.1 301 Moved Permanently\r\nlocation: #{CALLBACK_SUCESS_URI}\r\n"
     TOKEN_REQUEST_URI = 'https://accounts.spotify.com/api/token'
-    BASIC_AUTH = "Basic #{Base64.strict_encode64("#{ID}:#{SECRET}")}"
     
     def Auth.new_user show_dialog=true
         # generate random state
         state = 'state' #TODO generate random state
         
         # open human auth prompt
-        human_auth_prompt_query = {
+        query = {
             client_id: ID,
             response_type: 'code',
             redirect_uri: CALLBACK_URI,
@@ -31,7 +30,7 @@ module Auth
             scope: SCOPE,
             show_dialog: show_dialog
         }
-        Launchy.open "#{HUMAN_AUTH_PROMPT_URI}?#{URI.encode_www_form human_auth_prompt_query}"
+        Launchy.open "#{HUMAN_AUTH_PROMPT_URI}?#{URI.encode_www_form query}"
         
         # receive code from callback
         code = nil
@@ -60,46 +59,58 @@ module Auth
         end
         puts "code: #{code}" #TODO improve debug messages
 
-        # request token
-        req_token_header = {
-            authorization: BASIC_AUTH,
-            'content-type': 'application/x-www-form-urlencoded'
-        }
-        req_token_body = {
-            grant_type: 'authorization_code',
-            code: code,
-            redirect_uri: CALLBACK_URI
-        }
-        token_res = Request.post TOKEN_REQUEST_URI, {}, req_token_header, req_token_body #TODO better error handling
-        token_json = (JSON.parse token_res.body).transform_keys &:to_sym
-        puts token_json
-        user = User.new token_json[:access_token], token_json[:expires_in], token_json[:refresh_token]
-        user.refresh_token
+        # create user
+        user = User.new code, redirect_uri: CALLBACK_URI
+        user.refresh_token #TODO debug. please remove
     end
     
     class User
-        def initialize access_token, expires_in, refresh_token
-            @access_token = access_token
-            @expires_in = expires_in
-            @refresh_token = refresh_token
+        @@BASIC_AUTH = "Basic #{Base64.strict_encode64("#{ID}:#{SECRET}")}"
+
+        def initialize code, redirect_uri:
+            # request token
+            header = {
+                authorization: @@BASIC_AUTH,
+                'content-type': 'application/x-www-form-urlencoded'
+            }
+            body = {
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: redirect_uri
+            }
+            res = Request.post TOKEN_REQUEST_URI, header: header, body: body #TODO error handling
+            json = sym_keys JSON[res.body]
+            puts json #TODO better debug messages
+            @access_token = json[:access_token]
+            @expires_in = json[:expires_in]
+            @refresh_token = json[:refresh_token]
+
+            #TODO setup expiration stuff and so on
+
+            # request email
+
         end
 
         def refresh_token
             header = {
-                authorization: BASIC_AUTH,
+                authorization: @@BASIC_AUTH,
                 'content-type': 'application/x-www-form-urlencoded'
             }
             body = {
                 grant_type: 'refresh_token',
                 refresh_token: @refresh_token
             }
-            res = Request.post TOKEN_REQUEST_URI, {}, header, body
-            res_json = (JSON.parse res.body).transform_keys &:to_sym
+            res = Request.post TOKEN_REQUEST_URI, header: header, body: body #TODO better error handling
+            res_json = sym_keys JSON[res.body]
             @access_token = res_json[:access_token]
-            @expires_in = res_json[:expires_in]
-            puts res_json
+            @expires_in = res_json[:expires_in] #TODO setup expiration stuff
+            puts res_json #TODO better debug messages
         end
     end
+end
+
+def sym_keys hash
+    return hash.transform_keys &:to_sym
 end
 
 Auth.new_user
