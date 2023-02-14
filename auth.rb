@@ -88,15 +88,40 @@ module Auth
             }
             res = Request.post @@TOKEN_REQUEST_URI, header: header, body: body #TODO error handling
             json = JSON[res.body]
-            puts json #TODO better debug messages
             @access_token = json['access_token']
             @expiration_timestamp = Time.now + json['expires_in']
             @refresh_token = json['refresh_token']
+            puts json #TODO better debug messages
 
             @login_timestamp = Time.now
 
             #TODO request email
 
+        end
+
+        def login_timestamp
+            @login_timestamp
+        end
+
+        def email
+            @email
+        end
+
+        def <=> other
+            @login_timestamp <=> other.login_timestamp
+        end
+
+        def == other
+            @email = other.email
+        end
+
+        def authorize header={}
+            refresh_token if Time.now > @expiration_timestamp
+            header.merge({authorization: "Bearer #{@access_token}"})
+        end
+
+        def authorize! header
+            header.merge! authorize
         end
 
         def refresh_token
@@ -109,10 +134,10 @@ module Auth
                 refresh_token: @refresh_token
             }
             res = Request.post @@TOKEN_REQUEST_URI, header: header, body: body #TODO better error handling
-            res_json = JSON[res.body]
-            @access_token = res_json['access_token']
-            @expires_in = res_json['expires_in'] #TODO setup expiration stuff
-            puts res_json #TODO better debug messages
+            json = JSON[res.body]
+            @access_token = json['access_token']
+            @expiration_timestamp = Time.now + json['expires_in']
+            puts json #TODO better debug messages
         end
     end
 end
