@@ -67,8 +67,7 @@ module Auth
         puts "code: #{code}" #TODO improve debug messages
 
         # create user
-        user = User.new code, redirect_uri: cCALLBACK_URI
-        user.refresh_token #TODO debug. please remove
+        User.new code, redirect_uri: cCALLBACK_URI
     end
     
     class User
@@ -95,16 +94,16 @@ module Auth
 
             @login_timestamp = Time.now
 
-            #TODO request email
-
+            # user profile
+            @profile = Spotify.get_current_users_profile auth: self
         end
 
         def login_timestamp
             @login_timestamp
         end
 
-        def email
-            @email
+        def profile
+            @profile
         end
 
         def <=> other
@@ -112,7 +111,7 @@ module Auth
         end
 
         def == other
-            @email = other.email
+            @profile[:id] == other.profile[:id]
         end
 
         def authorize header={}
@@ -142,4 +141,9 @@ module Auth
     end
 end
 
-Auth.new_user
+user = Auth.new_user
+
+loop do
+    gets
+    Spotify.skip_to_next auth: user
+end
