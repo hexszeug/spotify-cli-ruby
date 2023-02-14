@@ -42,21 +42,27 @@ module Request
 end
 
 module Spotify
-    def Spotify.get_current_users_profile auth:
-        JSON[(api_call :GET, '/me', auth: auth).body, symbolize_names: true]
+    def Spotify.get_current_users_profile account:
+        JSON[(api_call :GET, '/me', account: account).body, symbolize_names: true]
         #TODO error handling
     end
 
-    def Spotify.skip_to_next auth:, device: nil
+    def Spotify.skip_to_next account:, device: nil
         query = device && device[:id] ? { device_id: device[:id] } : {}
-        api_call :POST, '/me/player/next', auth: auth, query: query
+        api_call :POST, '/me/player/next', account: account, query: query
         #TODO error handling
     end
 
-    private_class_method def Spotify.api_call method, endpoint, auth:, query: {}, body: {}
+    def Spotify.skip_to_previous account:, device: nil
+        query = device && device[:id] ? { device_id: device[:id] } : {}
+        api_call :POST, '/me/player/previous', account: account, query: query
+        #TODO error handling
+    end
+
+    private_class_method def Spotify.api_call method, endpoint, account:, query: {}, body: {}
         endpoint.gsub! /^\/|\/$/, '' # remove leading and trailing slashes
         path = "https://api.spotify.com/v1/#{endpoint}/"
-        header = auth.authorize({ 'content-type': 'application/json' })
+        header = account.authorize({ 'content-type': 'application/json' })
         body = JSON[body]
         case method
         when :GET

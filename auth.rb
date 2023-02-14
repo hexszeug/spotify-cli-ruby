@@ -11,7 +11,7 @@ module Auth
     SECRET = '77f2373853974699824602358ecdf9bd'
     private_constant :ID, :SECRET
     
-    def Auth.new_user show_dialog: true
+    def Auth.new_account show_dialog: true
         # constants
         cSCOPE = 'ugc-image-upload user-read-playback-state user-modify-playback-state playlist-read-private user-follow-modify playlist-read-collaborative user-follow-read user-read-currently-playing user-read-playback-position user-library-modify playlist-modify-private playlist-modify-public user-read-email user-top-read user-read-recently-played user-read-private user-library-read'
         cPOPUP_URI = 'https://accounts.spotify.com/authorize/'
@@ -66,11 +66,11 @@ module Auth
         server.close
         puts "code: #{code}" #TODO improve debug messages
 
-        # create user
-        User.new code, redirect_uri: cCALLBACK_URI
+        # create account
+        Account.new code, redirect_uri: cCALLBACK_URI
     end
     
-    class User
+    class Account
         @@TOKEN_REQUEST_URI = 'https://accounts.spotify.com/api/token'
         @@BASIC_AUTH = "Basic #{Base64.strict_encode64("#{ID}:#{SECRET}")}"
 
@@ -95,15 +95,15 @@ module Auth
             @login_timestamp = Time.now
 
             # user profile
-            @profile = Spotify.get_current_users_profile auth: self
+            @user = Spotify.get_current_users_profile account: self
         end
 
         def login_timestamp
             @login_timestamp
         end
 
-        def profile
-            @profile
+        def user
+            @user
         end
 
         def <=> other
@@ -111,7 +111,7 @@ module Auth
         end
 
         def == other
-            @profile[:id] == other.profile[:id]
+            @user[:id] == other.user[:id]
         end
 
         def authorize header={}
@@ -141,9 +141,13 @@ module Auth
     end
 end
 
-user = Auth.new_user
+account = Auth.new_account
 
 loop do
-    gets
-    Spotify.skip_to_next auth: user
+    case gets.chomp
+    when ''
+        Spotify.skip_to_next account: account
+    when '!'
+        Spotify.skip_to_previous account: account
+    end
 end
