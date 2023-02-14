@@ -1,0 +1,19 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    addressable (2.8.1)
+      public_suffix (>= 2.0.2, < 6.0)
+    launchy (2.5.2)
+      addressable (~> 2.8)
+    public_suffix (5.0.1)
+    webrick (1.8.1)
+
+PLATFORMS
+  x64-mingw-ucrt
+
+DEPENDENCIES
+  launchy
+  webrick
+
+BUNDLED WITH
+   2.4.6
