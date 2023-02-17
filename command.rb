@@ -8,7 +8,7 @@ module Command
             @root.then node #TODO catch build errors
             #TODO run ambiguity checks (or put them elsewere)
             # 1. cannot decide which argument node to take
-            # 2. duplicate argument names
+            # 2. duplicate argument names in single branch
         end
 
         def execute str
@@ -64,17 +64,26 @@ module Command
             @name
         end
 
-        # parsing, suggesting and executing methods
-
-        def valid? token
-            begin
-                parse token
-                true
-            rescue ParsingError
-                false
+        # to be overridden
+        def display_name
+            case @type
+            when :literal
+                @name
+            when :argument
+                "<#{@name.to_s}>"
+            else
+                ''
             end
         end
 
+        # parsing, suggesting and executing methods
+
+        # to be overridden
+        def valid? token
+            true
+        end
+
+        # to be overridden
         def parse token
             token
         end
@@ -89,7 +98,10 @@ module Command
             end
             # dispatch to next node
             token = context.first_untracked_token
-            return unless token
+            unless token
+                return if @executer
+                raise ParsingError.new :missing_args, context
+            end
             node = @literal_children[token]
             if node
                 node.dispatch context
@@ -101,12 +113,16 @@ module Command
                     return
                 end
             end
-            raise ParsingError::DispatchingError.new context
+            raise ParsingError.new :incorrect_args, context
+        end
+
+        def execute?
+            @executer.is_a? Proc
         end
 
         def execute context
-            unless @executer
-                raise ParsingError::DispatchingError.new context
+            unless context.valid?
+                raise ParsingError.new :invalid_context, context
             end
             @executer.call context
         end
@@ -173,24 +189,60 @@ module Command
             @cmd[@nodes.length]
         end
 
+        def valid?
+            @nodes.length == @cmd.length && @nodes.last.execute?
+        end
+
         def track_node node
             @nodes.push node
         end
     end
+
+    class CommandError < StandardError
+        def initialize msg
+            super msg
+            @msg = msg
+        end
+
+        def msg
+            @msg
+        end
+    end
     
-    class BuildingError < StandardError
+    class BuildingError < CommandError
+        def initialize type #TODO
+        end
     end
 
-    class ParsingError < StandardError
-        class DispatchingError < ParsingError
-            def initialize context
-                super "no matching sub-notes: command: #{context.cmd[0..context.nodes.length] * ' '}<- here"
-                @context = context
+    class ParsingError < CommandError
+        def initialize type, context
+            cmd_str = context.cmd * ' '
+            cmd_snippet = -> (length, cmd: nil) do
+                cmd = cmd_str unless cmd
+                cmd.length <= length ? cmd : '...' + cmd[-length..-1]
             end
+            case type
+            when :incorrect_args
+                super "not matching argument: #{cmd_snippet.call 15}<--HERE"
+            when :missing_args
+                super "incomplete command: #{cmd_snippet.call 15}<--HERE"
+            when :invalid_context
+                super "tried executing improperly parsed command. this is a bug and should not happen. please report"
+            when :invalid_token
+                super "malformed argument #{context.last_tracked.display_name}: #{cmd_snippet.call 15, cmd: context.cmd[0...context.nodes.length] * ' '}<--HERE"
+            else
+                super type
+            end
+            @type = type
+            @context = context
+        end
 
-            def context
-                context
-            end
+        def type
+            @type
+        end
+
+        def context
+            @context
         end
     end
 end
