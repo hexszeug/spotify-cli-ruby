@@ -119,7 +119,7 @@ module Command
             token = context.first_untracked_token
             unless token
                 return if @executer
-                raise ParsingError.new :missing_args, context
+                raise ParsingError.new :missing_arg, context
             end
             # dispatch to next node
             # dispatch to literal if matching
@@ -133,14 +133,22 @@ module Command
                 arg.dispatch context
                 return
             end
-            raise ParsingError.new :incorrect_args, context
+            raise ParsingError.new :incorrect_arg, context
         end
 
         ### suggesting methods
 
-        def suggestions context
+        def list_suggestions context
+            return [@name] if @type == :literal
             return [] unless @suggester.is_a? Proc
             @suggester.call context
+        end
+
+        def suggest context
+            res = []
+            @literal_children.each_value {|node| res += node.list_suggestions context}
+            @argument_children.each_value {|node| res += node.list_suggestions context}
+            res
         end
 
         ### executing methods
@@ -166,11 +174,45 @@ module Command
             @root.then node
         end
 
+        def suggest str
+            begin
+                context = parse str
+                node = context.last_tracked
+                complete_token = context.last_tracked_token
+            rescue ParsingError => e
+                context = e.context
+                #TODO multiple empty args
+                case e.type
+                when :missing_arg # "<--HERE" / "command<--HERE"
+                    node = context.nodes[-2]
+                    complete_token = context.last_tracked_token
+                when :incorrect_arg # "command jdkslfj<--HERE" / "command <--HERE"
+                    node = context.last_tracked
+                    complete_token = context.first_untracked_token
+                    raise e unless context.nodes.length + 1 == context.cmd.length
+                else
+                    raise e
+                end
+            end
+            node = @root unless node
+            complete_token = '' unless complete_token
+            sugs = node.suggest(context)
+            sugs.filter! {|sug| sug.start_with? complete_token}
+            raise e if sugs.empty?
+            sugs.sort
+        end
+
         def execute str
-            cmd = str.split ' ', -1 #TODO handle consecutive spaces
+            context = parse str
+            context.last_tracked.execute context
+        end
+
+        private
+        def parse str
+            cmd = str.split /\s/, -1 #TODO handle consecutive spaces
             context = CommandContext.new cmd
             @root.dispatch context
-            context.last_tracked.execute context
+            context
         end
     end
 
@@ -261,9 +303,9 @@ module Command
                 cmd.length <= length ? cmd : '...' + cmd[-length..-1]
             end
             case type
-            when :incorrect_args
+            when :incorrect_arg
                 super "not matching argument: #{cmd_snippet.call 15}<--HERE"
-            when :missing_args
+            when :missing_arg
                 super "incomplete command: #{cmd_snippet.call 15}<--HERE"
             when :invalid_context
                 super "tried executing improperly parsed command. this is a bug and should not happen. please report"
