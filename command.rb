@@ -222,11 +222,11 @@ module Command
         def initialize type, parent, *nodes
             case type
             when :child_root
-                super "cannot add root node #{nodes[0].name} to #{parent.name}"
+                super "cannot add root node #{nodes[0].display_name} to #{parent.display_name}"
             when :duplicate_names
-                super "#{parent.name} already has a note named #{nodes[1].name}"
+                super "#{parent.display_name} already has a note named #{nodes[1].display_name}"
             when :indistinguishable_arguments
-                super "parser cannot distinguish between #{node[1].name} and #{node[0].name} (cannot be added to #{parent.name})"
+                super "parser cannot distinguish between #{node[1].display_name} and #{node[0].display_name} (cannot be added to #{parent.display_name})"
             when :not_a_node
                 super "#{nodes[0]} is not a node"
             end
