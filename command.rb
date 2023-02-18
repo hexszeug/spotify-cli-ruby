@@ -1,21 +1,4 @@
 module Command
-    class CommandDispatcher
-        def initialize
-            @root = CommandNode.new :root, ''
-        end
-
-        def register node
-            @root.then node
-        end
-
-        def execute str
-            cmd = str.split ' ', -1 #TODO handle consecutive spaces
-            context = CommandContext.new cmd
-            @root.dispatch context
-            context.last_tracked.execute context
-        end
-    end
-
     def literal literal
         CommandNode.new :literal, literal
     end
@@ -49,9 +32,10 @@ module Command
             @literal_children = {}
             @argument_children = {}
             @executer = nil
+            @suggester = nil
         end
 
-        # getter
+        ### getter
 
         def type
             @type
@@ -73,7 +57,45 @@ module Command
             end
         end
 
-        # parsing, suggesting and executing methods
+        ### building methods
+
+        def then node
+            unless node.is_a? CommandNode
+                raise BuildingError.new :not_a_node, self, node
+            end
+            case node.type
+            when :root
+                raise BuildingError.new :child_root, self, node
+            when :literal
+                if @literal_children[node.name]
+                    raise BuildingError.new :duplicate_names, self, node, @literal_children[node.name]
+                end
+                @literal_children[node.name] = node
+            when :argument
+                if @argument_children[node.name]
+                    raise BuildingError.new :duplicate_names, self, node, @argument_children[node.name]
+                end
+                @argument_children.each_value do |arg|
+                    if arg.instance_of? node.class
+                        raise BuildingError.new :indistinguishable_arguments, self, node, arg
+                    end
+                end
+                @argument_children[node.name] = node
+            end
+            self
+        end
+
+        def suggests &suggester
+            @suggester = suggester
+            self
+        end
+
+        def executes &executer
+            @executer = executer
+            self
+        end
+
+        ### parsing methods
 
         # to be overridden
         def valid? token
@@ -114,6 +136,15 @@ module Command
             raise ParsingError.new :incorrect_args, context
         end
 
+        ### suggesting methods
+
+        def suggestions context
+            return [] unless @suggester.is_a? Proc
+            @suggester.call context
+        end
+
+        ### executing methods
+
         def execute?
             @executer.is_a? Proc
         end
@@ -124,44 +155,22 @@ module Command
             end
             @executer.call context
         end
+    end
 
-        # building methods
-
-        def then node
-            unless node.is_a? CommandNode
-                raise BuildingError.new :not_a_node, self, node
-            end
-            case node.type
-            when :root
-                raise BuildingError.new :child_root, self, node
-            when :literal
-                if @literal_children[node.name]
-                    raise BuildingError.new :duplicate_names, self, node, @literal_children[node.name]
-                end
-                @literal_children[node.name] = node
-            when :argument
-                if @argument_children[node.name]
-                    raise BuildingError.new :duplicate_names, self, node, @argument_children[node.name]
-                end
-                @argument_children.each_value do |arg|
-                    if arg.instance_of? node.class
-                        raise BuildingError.new :indistinguishable_arguments, self, node, arg
-                    end
-                end
-                @argument_children[node.name] = node
-            end
-            self
+    class CommandDispatcher
+        def initialize
+            @root = CommandNode.new :root, ''
         end
 
-        def remove node_name
-            @literal_children.remove node_name
-            @argument_children.remove node_name
-            self
+        def register node
+            @root.then node
         end
 
-        def executes &executer
-            @executer = executer
-            self
+        def execute str
+            cmd = str.split ' ', -1 #TODO handle consecutive spaces
+            context = CommandContext.new cmd
+            @root.dispatch context
+            context.last_tracked.execute context
         end
     end
 
