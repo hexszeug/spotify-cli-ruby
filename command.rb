@@ -5,10 +5,7 @@ module Command
         end
 
         def register node
-            @root.then node #TODO catch build errors
-            #TODO run ambiguity checks (or put them elsewere)
-            # 1. cannot decide which argument node to take
-            # 2. duplicate argument names in single branch
+            @root.then node
         end
 
         def execute str
@@ -96,22 +93,23 @@ module Command
                     context[@name] = parse context.last_tracked_token
                 end
             end
-            # dispatch to next node
+            # detect command ending
             token = context.first_untracked_token
             unless token
                 return if @executer
                 raise ParsingError.new :missing_args, context
             end
-            node = @literal_children[token]
-            if node
+            # dispatch to next node
+            # dispatch to literal if matching
+            if node = @literal_children[token]
                 node.dispatch context
                 return
             end
-            @argument_children.each_value do |node|
-                if node.valid? token
-                    node.dispatch context
-                    return
-                end
+            # dispatch to argument (match sub classes before classes)
+            arg = @argument_children.values.filter{|a| a.valid? token}.sort{|a, b| a.class <=> b.class}.first
+            if arg
+                arg.dispatch context
+                return
             end
             raise ParsingError.new :incorrect_args, context
         end
@@ -130,12 +128,26 @@ module Command
         # building methods
 
         def then node
+            unless node.is_a? CommandNode
+                raise BuildingError.new :not_a_node, self, node
+            end
             case node.type
             when :root
-                raise BuildingError.new 'cannot add root nodes as children'
+                raise BuildingError.new :child_root, self, node
             when :literal
+                if @literal_children[node.name]
+                    raise BuildingError.new :duplicate_names, self, node, @literal_children[node.name]
+                end
                 @literal_children[node.name] = node
             when :argument
+                if @argument_children[node.name]
+                    raise BuildingError.new :duplicate_names, self, node, @argument_children[node.name]
+                end
+                @argument_children.each_value do |arg|
+                    if arg.instance_of? node.class
+                        raise BuildingError.new :indistinguishable_arguments, self, node, arg
+                    end
+                end
                 @argument_children[node.name] = node
             end
             self
@@ -165,7 +177,15 @@ module Command
         end
 
         def []= arg_name, arg
-            @args[arg_name] = arg
+            if a = @args[arg_name]
+                if a.instance_of? Array
+                    a.push arg
+                else
+                    @args[arg_name] = [a, arg]
+                end
+            else
+                @args[arg_name] = arg
+            end
         end
 
         def cmd
@@ -197,6 +217,21 @@ module Command
             @nodes.push node
         end
     end
+    
+    class BuildingError < ScriptError
+        def initialize type, parent, *nodes
+            case type
+            when :child_root
+                super "cannot add root node #{nodes[0].name} to #{parent.name}"
+            when :duplicate_names
+                super "#{parent.name} already has a note named #{nodes[1].name}"
+            when :indistinguishable_arguments
+                super "parser cannot distinguish between #{node[1].name} and #{node[0].name} (cannot be added to #{parent.name})"
+            when :not_a_node
+                super "#{nodes[0]} is not a node"
+            end
+        end
+    end
 
     class CommandError < StandardError
         def initialize msg
@@ -206,11 +241,6 @@ module Command
 
         def msg
             @msg
-        end
-    end
-    
-    class BuildingError < CommandError
-        def initialize type #TODO
         end
     end
 
