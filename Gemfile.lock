@@ -6,14 +6,33 @@ GEM
     debug (1.7.1)
       irb (>= 1.5.0)
       reline (>= 0.3.1)
+    haml (6.1.1)
+      temple (>= 0.8.2)
+      thor
+      tilt
     io-console (0.6.0)
     irb (1.6.2)
       reline (>= 0.3.0)
     launchy (2.5.2)
       addressable (~> 2.8)
+    prettier_print (1.2.0)
     public_suffix (5.0.1)
+    rbs (2.8.4)
     reline (0.3.2)
       io-console (~> 0.5)
+    syntax_tree (6.0.0)
+      prettier_print (>= 1.2.0)
+    syntax_tree-haml (3.0.0)
+      haml (>= 5.2, != 6.0.0)
+      prettier_print (>= 1.0.0)
+      syntax_tree (>= 5.0.1)
+    syntax_tree-rbs (0.5.1)
+      prettier_print
+      rbs
+      syntax_tree (>= 2.0.1)
+    temple (0.10.0)
+    thor (1.2.1)
+    tilt (2.1.0)
     webrick (1.8.1)
 
 PLATFORMS
@@ -22,6 +41,10 @@ PLATFORMS
 DEPENDENCIES
   debug
   launchy
+  prettier_print
+  syntax_tree
+  syntax_tree-haml
+  syntax_tree-rbs
   webrick
 
 BUNDLED WITH

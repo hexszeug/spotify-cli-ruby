@@ -1,0 +1,14 @@
+{
+  "overrides": [
+    {
+      "files": "*.rb",
+      "options": {
+        "tabWidth": 4,
+        "rubySingleQuote": true,
+        "trailingComma": "all",
+        "bracketSpacing": true,
+        "endOfLine": "lf"
+      }
+    }
+  ]
+}
