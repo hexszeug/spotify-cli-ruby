@@ -1,11 +1,14 @@
 {
   "configurations": [
     {
-      "name": "Run ruby task hack",
-      "program": "${file}",
+      "type": "rdbg",
+      "name": "Debug current ruby file",
       "request": "launch",
-      "type": "Ruby",
-      "preLaunchTask": "run ruby"
+      "useBundler": true,
+      "script": "${file}",
+      "askParameters": false,
+      "useTerminal": true,
+      "cwd": "${workspaceFolder}"
     }
   ]
 }

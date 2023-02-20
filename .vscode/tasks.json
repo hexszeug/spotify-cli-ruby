@@ -2,15 +2,15 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "run ruby",
-      "command": "ruby ${file}",
+      "label": "bundle install",
+      "command": "bundle install",
       "type": "shell",
       "args": [],
       "problemMatcher": ["$tsc"],
       "presentation": {
         "reveal": "always"
       },
-      "group": "none"
+      "group": "build"
     }
   ]
 }
