@@ -10,10 +10,11 @@ module Auth
     ID = '4388096316894b88a147b53559d0c14a'
     SECRET = '77f2373853974699824602358ecdf9bd'
     private_constant :ID, :SECRET
-    
-    def Auth.new_account show_dialog: true
+
+    def Auth.new_account(show_dialog: true)
         # constants
-        cSCOPE = 'ugc-image-upload user-read-playback-state user-modify-playback-state playlist-read-private user-follow-modify playlist-read-collaborative user-follow-read user-read-currently-playing user-read-playback-position user-library-modify playlist-modify-private playlist-modify-public user-read-email user-top-read user-read-recently-played user-read-private user-library-read'
+        cSCOPE =
+            'ugc-image-upload user-read-playback-state user-modify-playback-state playlist-read-private user-follow-modify playlist-read-collaborative user-follow-read user-read-currently-playing user-read-playback-position user-library-modify playlist-modify-private playlist-modify-public user-read-email user-top-read user-read-recently-played user-read-private user-library-read'
         cPOPUP_URI = 'https://accounts.spotify.com/authorize/'
         cCALLBACK_HOSTNAME = 'localhost'
         cCALLBACK_PORT = 3000
@@ -22,7 +23,7 @@ module Auth
 
         # generate random state
         state = 'state' #TODO generate random state
-        
+
         # open human auth prompt
         query = {
             client_id: ID,
@@ -33,7 +34,7 @@ module Auth
             show_dialog: show_dialog
         }
         Launchy.open "#{cPOPUP_URI}?#{URI.encode_www_form query}"
-        
+
         # receive code from callback
         server = TCPServer.new cCALLBACK_HOSTNAME, cCALLBACK_PORT
         code = nil
@@ -69,12 +70,12 @@ module Auth
         # create account
         Account.new code, redirect_uri: cCALLBACK_URI
     end
-    
+
     class Account
         @@TOKEN_REQUEST_URI = 'https://accounts.spotify.com/api/token'
         @@BASIC_AUTH = "Basic #{Base64.strict_encode64("#{ID}:#{SECRET}")}"
 
-        def initialize code, redirect_uri:
+        def initialize(code, redirect_uri:)
             # request token
             header = {
                 authorization: @@BASIC_AUTH,
@@ -106,20 +107,20 @@ module Auth
             @user
         end
 
-        def <=> other
+        def <=>(other)
             @login_timestamp <=> other.login_timestamp
         end
 
-        def == other
+        def ==(other)
             @user[:id] == other.user[:id]
         end
 
-        def authorize header={}
+        def authorize(header = {})
             refresh_token if Time.now > @expiration_timestamp
-            header.merge({authorization: "Bearer #{@access_token}"})
+            header.merge({ authorization: "Bearer #{@access_token}" })
         end
 
-        def authorize! header
+        def authorize!(header)
             header.merge! authorize
         end
 
@@ -128,10 +129,7 @@ module Auth
                 authorization: @@BASIC_AUTH,
                 'content-type': 'application/x-www-form-urlencoded'
             }
-            body = {
-                grant_type: 'refresh_token',
-                refresh_token: @refresh_token
-            }
+            body = { grant_type: 'refresh_token', refresh_token: @refresh_token }
             res = Request.post @@TOKEN_REQUEST_URI, header: header, body: body #TODO better error handling
             json = JSON[res.body]
             @access_token = json['access_token']

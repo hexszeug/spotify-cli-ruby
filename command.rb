@@ -1,14 +1,14 @@
 module Command
-    def literal literal
+    def literal(literal)
         CommandNode.new :literal, literal
     end
 
-    def argument name
+    def argument(name)
         CommandNode.new :argument, name
     end
 
     class CommandNode
-        def initialize type, name
+        def initialize(type, name)
             case type
             when :root
                 unless name == ''
@@ -17,7 +17,7 @@ module Command
             when :literal
                 name = name.to_s
                 unless name =~ /^\S+$/
-                    raise ArgumentError.new "name of literal cannot contain whitespaces"
+                    raise ArgumentError.new 'name of literal cannot contain whitespaces'
                 end
             when :argument
                 name = name.to_s unless name.is_a? Symbol
@@ -59,7 +59,7 @@ module Command
 
         ### building methods
 
-        def then node
+        def then(node)
             unless node.is_a? CommandNode
                 raise BuildingError.new :not_a_node, self, node
             end
@@ -68,16 +68,25 @@ module Command
                 raise BuildingError.new :child_root, self, node
             when :literal
                 if @literal_children[node.name]
-                    raise BuildingError.new :duplicate_names, self, node, @literal_children[node.name]
+                    raise BuildingError.new :duplicate_names,
+                                                                    self,
+                                                                    node,
+                                                                    @literal_children[node.name]
                 end
                 @literal_children[node.name] = node
             when :argument
                 if @argument_children[node.name]
-                    raise BuildingError.new :duplicate_names, self, node, @argument_children[node.name]
+                    raise BuildingError.new :duplicate_names,
+                                                                    self,
+                                                                    node,
+                                                                    @argument_children[node.name]
                 end
                 @argument_children.each_value do |arg|
                     if arg.instance_of? node.class
-                        raise BuildingError.new :indistinguishable_arguments, self, node, arg
+                        raise BuildingError.new :indistinguishable_arguments,
+                                                                        self,
+                                                                        node,
+                                                                        arg
                     end
                 end
                 @argument_children[node.name] = node
@@ -85,12 +94,12 @@ module Command
             self
         end
 
-        def suggests &suggester
+        def suggests(&suggester)
             @suggester = suggester
             self
         end
 
-        def executes &executer
+        def executes(&executer)
             @executer = executer
             self
         end
@@ -98,22 +107,20 @@ module Command
         ### parsing methods
 
         # to be overridden
-        def valid? token
+        def valid?(token)
             true
         end
 
         # to be overridden
-        def parse token
+        def parse(token)
             token
         end
 
-        def dispatch context
+        def dispatch(context)
             # track and parse self
             unless @type == :root
                 context.track_node self
-                if @type == :argument
-                    context[@name] = parse context.last_tracked_token
-                end
+                context[@name] = parse context.last_tracked_token if @type == :argument
             end
             # detect command ending
             token = context.first_untracked_token
@@ -128,7 +135,12 @@ module Command
                 return
             end
             # dispatch to argument (match sub classes before classes)
-            arg = @argument_children.values.filter{|a| a.valid? token}.sort{|a, b| a.class <=> b.class}.first
+            arg =
+                @argument_children
+                    .values
+                    .filter { |a| a.valid? token }
+                    .sort { |a, b| a.class <=> b.class }
+                    .first
             if arg
                 arg.dispatch context
                 return
@@ -138,16 +150,20 @@ module Command
 
         ### suggesting methods
 
-        def list_suggestions context
+        def list_suggestions(context)
             return [@name] if @type == :literal
             return [] unless @suggester.is_a? Proc
             @suggester.call context
         end
 
-        def suggest context
+        def suggest(context)
             res = []
-            @literal_children.each_value {|node| res += node.list_suggestions context}
-            @argument_children.each_value {|node| res += node.list_suggestions context}
+            @literal_children.each_value do |node|
+                res += node.list_suggestions context
+            end
+            @argument_children.each_value do |node|
+                res += node.list_suggestions context
+            end
             res
         end
 
@@ -157,10 +173,8 @@ module Command
             @executer.is_a? Proc
         end
 
-        def execute context
-            unless context.valid?
-                raise ParsingError.new :invalid_context, context
-            end
+        def execute(context)
+            raise ParsingError.new :invalid_context, context unless context.valid?
             @executer.call context
         end
     end
@@ -170,11 +184,11 @@ module Command
             @root = CommandNode.new :root, ''
         end
 
-        def register node
+        def register(node)
             @root.then node
         end
 
-        def suggest str
+        def suggest(str)
             begin
                 context = parse str
                 node = context.last_tracked
@@ -197,18 +211,19 @@ module Command
             node = @root unless node
             complete_token = '' unless complete_token
             sugs = node.suggest(context)
-            sugs.filter! {|sug| sug.start_with? complete_token}
+            sugs.filter! { |sug| sug.start_with? complete_token }
             raise e if sugs.empty?
             sugs.sort
         end
 
-        def execute str
+        def execute(str)
             context = parse str
             context.last_tracked.execute context
         end
 
         private
-        def parse str
+
+        def parse(str)
             cmd = str.split /\s/, -1 #TODO handle consecutive spaces
             context = CommandContext.new cmd
             @root.dispatch context
@@ -217,17 +232,17 @@ module Command
     end
 
     class CommandContext
-        def initialize cmd
+        def initialize(cmd)
             @cmd = cmd
             @nodes = []
             @args = {}
         end
 
-        def [] arg_name
+        def [](arg_name)
             @args[arg_name]
         end
 
-        def []= arg_name, arg
+        def []=(arg_name, arg)
             if a = @args[arg_name]
                 if a.instance_of? Array
                     a.push arg
@@ -264,13 +279,13 @@ module Command
             @nodes.length == @cmd.length && @nodes.last.execute?
         end
 
-        def track_node node
+        def track_node(node)
             @nodes.push node
         end
     end
-    
+
     class BuildingError < ScriptError
-        def initialize type, parent, *nodes
+        def initialize(type, parent, *nodes)
             case type
             when :child_root
                 super "cannot add root node #{nodes[0].display_name} to #{parent.display_name}"
@@ -285,7 +300,7 @@ module Command
     end
 
     class CommandError < StandardError
-        def initialize msg
+        def initialize(msg)
             super msg
             @msg = msg
         end
@@ -296,9 +311,9 @@ module Command
     end
 
     class ParsingError < CommandError
-        def initialize type, context
+        def initialize(type, context)
             cmd_str = context.cmd * ' '
-            cmd_snippet = -> (length, cmd: nil) do
+            cmd_snippet = ->(length, cmd: nil) do
                 cmd = cmd_str unless cmd
                 cmd.length <= length ? cmd : '...' + cmd[-length..-1]
             end
@@ -308,7 +323,7 @@ module Command
             when :missing_arg
                 super "incomplete command: #{cmd_snippet.call 15}<--HERE"
             when :invalid_context
-                super "tried executing improperly parsed command. this is a bug and should not happen. please report"
+                super 'tried executing improperly parsed command. this is a bug and should not happen. please report'
             when :invalid_token
                 super "malformed argument #{context.last_tracked.display_name}: #{cmd_snippet.call 15, cmd: context.cmd[0...context.nodes.length] * ' '}<--HERE"
             else
