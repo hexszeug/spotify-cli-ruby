@@ -3,6 +3,7 @@ GEM
   specs:
     addressable (2.8.1)
       public_suffix (>= 2.0.2, < 6.0)
+    curses (1.4.4)
     debug (1.7.1)
       irb (>= 1.5.0)
       reline (>= 0.3.1)
@@ -39,6 +40,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  curses
   debug
   launchy
   prettier_print
