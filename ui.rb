@@ -22,44 +22,42 @@ module UI
         @wout.scrollok true
 
         # set initial size and spacing
-        resize
+        on_resize
     end
 
     def UI.tick
         # read curses input buffer
         while ch = @win.get_char
-            line = Input.read ch
-            if line
-                #TODO exec command
-            end
+            Input.read ch
         end
         # if scroll
         Input.refresh @win
     end
 
-    def self.redraw
-        resize
+    def self.on_resize
+        Utils.resize_window @win, 1, -2, -1, -2
+        Utils.resize_window @wout, 1, 1, -1, -4
+        Curses.clear
+        Curses.refresh
+        Input.on_resize @win
     end
 
-    def self.resize
-        resize_window @win, 1, -2, -1, -2
-        resize_window @wout, 1, 1, -1, -4
-        Input.resize @win.maxx
-    end
-
-    def self.resize_window(
-        win,
-        top_left_x,
-        top_left_y,
-        bottom_right_x,
-        bottom_right_y
-    )
-        top_left_x = Curses.cols + top_left_x if top_left_x < 0
-        top_left_y = Curses.lines + top_left_y if top_left_y < 0
-        bottom_right_x = Curses.cols + bottom_right_x if bottom_right_x < 0
-        bottom_right_y = Curses.lines + bottom_right_y if bottom_right_y < 0
-        win.resize bottom_right_y - top_left_y + 1, bottom_right_x - top_left_x + 1
-        win.move top_left_y, top_left_x
+    module Utils
+        def Utils.resize_window(
+            win,
+            top_left_x,
+            top_left_y,
+            bottom_right_x,
+            bottom_right_y
+        )
+            top_left_x = Curses.cols + top_left_x if top_left_x < 0
+            top_left_y = Curses.lines + top_left_y if top_left_y < 0
+            bottom_right_x = Curses.cols + bottom_right_x if bottom_right_x < 0
+            bottom_right_y = Curses.lines + bottom_right_y if bottom_right_y < 0
+            win.resize bottom_right_y - top_left_y + 1,
+                                  bottom_right_x - top_left_x + 1
+            win.move top_left_y, top_left_x
+        end
     end
 
     module Input
@@ -71,8 +69,8 @@ module UI
         @changed = false
         @display_size = 0
 
-        def Input.resize(size)
-            size -= 1
+        def Input.on_resize(win)
+            size = win.maxx - 1
             return if size == @display_size
             @changed = true
             prev_size = @display_size
@@ -102,7 +100,7 @@ module UI
             #TODO history
             case ch
             when RESIZE
-                UI.redraw
+                UI.on_resize
             when BACKSPACE
                 return unless @cursor > 0
                 @string.slice! @cursor - 1
