@@ -22,7 +22,7 @@ module UI
         @wout.scrollok true
 
         # set initial size and spacing
-        resize_windows
+        resize
     end
 
     def UI.tick
@@ -34,25 +34,32 @@ module UI
             end
         end
         # if scroll
-        if Input.changed?
-            @win.setpos 0, 0
-            @win.deleteln
-            @win.addstr Input.string
-            @win.setpos 0, Input.cursor
-            @win.refresh
-        end
+        Input.refresh @win
     end
 
     def self.redraw
-        @wout.bkgd "#"
-        @wout.noutrefresh
+        resize
     end
 
-    def self.resize_windows
-        @win.resize 1, Curses.cols
-        @win.move Curses.lines - @win.maxy, 0
-        @wout.resize Curses.lines - @win.maxy, Curses.cols
-        @wout.move 0, 0
+    def self.resize
+        resize_window @win, 1, -2, -1, -2
+        resize_window @wout, 1, 1, -1, -4
+        Input.resize @win.maxx
+    end
+
+    def self.resize_window(
+        win,
+        top_left_x,
+        top_left_y,
+        bottom_right_x,
+        bottom_right_y
+    )
+        top_left_x = Curses.cols + top_left_x if top_left_x < 0
+        top_left_y = Curses.lines + top_left_y if top_left_y < 0
+        bottom_right_x = Curses.cols + bottom_right_x if bottom_right_x < 0
+        bottom_right_y = Curses.lines + bottom_right_y if bottom_right_y < 0
+        win.resize bottom_right_y - top_left_y + 1, bottom_right_x - top_left_x + 1
+        win.move top_left_y, top_left_x
     end
 
     module Input
@@ -60,60 +67,113 @@ module UI
 
         @string = ""
         @cursor = 0
-        @changed = true
+        @display_cursor = 0
+        @changed = false
+        @display_size = 0
 
-        def Input.changed?
-            @changed
+        def Input.resize(size)
+            size -= 1
+            return if size == @display_size
+            @changed = true
+            prev_size = @display_size
+            @display_size = size
+            if @display_cursor >= @display_size
+                @display_cursor = @display_size - 1
+            elsif @cursor == @string.length && @display_cursor == prev_size - 1
+                @display_cursor = [@cursor, @display_size - 1].min
+            end
         end
 
-        def Input.string
+        def Input.refresh(win)
+            return unless @changed
             @changed = false
-            @string
-        end
-
-        def Input.cursor
-            @cursor
+            s = @cursor - @display_cursor
+            e = s + @display_size
+            win.deleteln
+            win.setpos 0, 0
+            win.addstr @string[s...e]
+            win.setpos 0, @display_cursor
+            win.refresh
         end
 
         def Input.read(ch)
-            #TODO horizontal scroll
-            #TODO selection and clipboard support
-            #TODO CTRL+Arrows, CTRL+BACKSPACE CTRL+DELET HOME, END Support (compatible with selection and hor scroll)
             #TODO suggestions (TAB Arrow Up/Down, maybe PPAGE, NPAGE)
             #TODO insert-mode
+            #TODO history
             case ch
             when RESIZE
-                redraw
-            when BACKSPACE, "\b"
+                UI.redraw
+            when BACKSPACE
                 return unless @cursor > 0
-                @changed = true
-                @cursor -= 1
-                @string.slice! @cursor
+                @string.slice! @cursor - 1
+                move_cursor @cursor - 1
+            when "\b" #CTRL+BACKSPACE (for some random reason)
+                return unless @cursor > 0
+                c = @cursor - 2
+                i = @string.rindex(/ [^ ]/, c < 0 ? 0 : c)
+                i = i ? i + 1 : 0
+                @string.slice! i...@cursor
+                move_cursor i
             when DC
                 return if @string.empty?
-                @changed = true
                 @string.slice! @cursor
+            when 0x208 #CTRL+DC
+                return if @string.empty?
+                i = @string.index(/ [^ ]/, @cursor)
+                @string.slice! @cursor..i
             when LEFT
-                return unless cursor > 0
-                @changed = true
-                @cursor -= 1
+                return unless @cursor > 0
+                move_cursor @cursor - 1
+            when 0x222 #CTRL+LEFT
+                return unless @cursor > 0
+                c = @cursor - 2
+                i = @string.rindex(/ [^ ]/, c < 0 ? 0 : c)
+                move_cursor i ? i + 1 : 0
+            when HOME
+                return unless @cursor > 0
+                move_cursor 0
             when RIGHT
-                return unless cursor < @string.length
-                @changed = true
-                @cursor += 1
+                return unless @cursor < @string.length
+                move_cursor @cursor + 1
+            when 0x231 #CTRL+RIGHT
+                return unless @cursor < @string.length
+                i = @string.index(/ [^ ]/, @cursor)
+                move_cursor i ? i + 1 : @string.length
+            when Curses::KEY_END
+                return unless @cursor < @string.length
+                move_cursor @string.length
             when ENTER, "\n", "\r"
                 return if @string.empty?
-                @changed = true
+                @changed = true #TODO remove (clean code)
                 str = @string
                 @string = ""
-                return str
+                @cursor = 0
+                @display_cursor = 0
+                return str #TODO would cause errors if ^ was removed
+            when 0x109 #F1 #TODO temporary exit
+                Curses.close_screen
+                exit
             else
                 return unless ch.is_a?(String) && ch =~ /^[[:print:]]$/
-                @changed = true
                 @string.insert @cursor, ch
-                @cursor += 1
+                move_cursor @cursor + 1
             end
+            @changed = true
             return
+        end
+
+        def self.move_cursor(cursor)
+            return if !cursor.between?(0, @string.length) || cursor == @cursor
+            d = (@cursor - cursor).abs
+            if @cursor > cursor
+                @display_cursor -= d
+                unless @display_cursor > 0
+                    @display_cursor = [cursor, @display_size - 1].min
+                end
+            else
+                @display_cursor = [@display_cursor + d, @display_size - 1].min
+            end
+            @cursor = cursor
         end
     end
 
