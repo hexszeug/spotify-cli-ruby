@@ -180,7 +180,9 @@ module UI
                 @history_pointer = @history.length - 1
                 move_cursor 0
             when 0x237 #CTRL+UP
+                Output.scroll -1
             when 0x20e #CTRL+DOWN
+                Output.scroll 1
             when 0x109 #F1 #TODO temporary exit
                 Curses.close_screen
                 exit
@@ -217,7 +219,7 @@ module UI
 
         def Output.on_resize(win)
             h = win.maxy
-            w = win.maxx
+            w = win.maxx - 1
             return if @height == h && @width == w
             @changed = true
             @height = h
@@ -227,20 +229,22 @@ module UI
         def Output.refresh(win)
             return false unless @changed
             @changed = false
-            #TODO implement scrolling
+            scroll = @scroll.clone
+            #TODO cache out
+            #TODO use native scroll
             out = []
             @output.reverse_each do |gen|
-                msg = gen.call @width
+                msg = gen.call(@width).clone
                 msg = [msg] if msg.is_a? String
                 next unless msg.is_a? Array
                 msg.each.with_index do |str, i|
                     x = str.slice! @width..nil
-                    msg.insert i + 1, x if x
+                    msg.insert i + 1, x if x && !x.empty?
                 end
-                out = msg + out
-                if out.length >= @height
-                    out.shift out.length - @height
-                    break
+                msg.reverse_each do |str|
+                    out.unshift str unless scroll > 0
+                    scroll -= 1 if scroll > 0
+                    break if out.length >= @height
                 end
             end
             win.clear
@@ -255,6 +259,12 @@ module UI
             return unless msg.is_a? Proc
             return unless msg.lambda?
             @output.push msg
+            @scroll = 0
+            @changed = true
+        end
+
+        def Output.scroll(amount)
+            @scroll = [@scroll - amount, 0].max
             @changed = true
         end
     end
