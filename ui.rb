@@ -174,18 +174,23 @@ module UI
             when ENTER, "\n", "\r"
                 return if @string.empty?
                 UI.on_return @string.clone
-                @history[-1] = @string.clone
-                @history.push @string
+                if @history[-2] == @string
+                    @history[-1] = @string
+                else
+                    @history[-1] = @string.clone
+                    @history.push @string
+                end
                 @string.clear
                 @history_pointer = @history.length - 1
                 move_cursor 0
             when 0x237 #CTRL+UP
                 Output.scroll -1
+            when PPAGE
+                Output.scroll { |h| 1 - h }
             when 0x20e #CTRL+DOWN
                 Output.scroll 1
-            when 0x109 #F1 #TODO temporary exit
-                Curses.close_screen
-                exit
+            when NPAGE
+                Output.scroll { |h| h - 1 }
             else
                 return unless ch.is_a?(String) && ch =~ /^[[:print:]]$/
                 @string.insert @cursor, ch
@@ -211,61 +216,98 @@ module UI
     end
 
     module Output
-        @output = []
+        @generators = []
+        @old_generators_length = 0
+        @display = []
         @scroll = 0
+        @old_scroll = 0
         @height = 0
         @width = 0
-        @changed = false
+        @changed_size = false
 
         def Output.on_resize(win)
             h = win.maxy
             w = win.maxx - 1
             return if @height == h && @width == w
-            @changed = true
+            @changed_size = true
             @height = h
             @width = w
         end
 
-        def Output.refresh(win)
-            return false unless @changed
-            @changed = false
-            scroll = @scroll.clone
-            #TODO cache out
-            #TODO use native scroll
-            out = []
-            @output.reverse_each do |gen|
-                msg = gen.call(@width).clone
-                msg = [msg] if msg.is_a? String
-                next unless msg.is_a? Array
-                msg.each.with_index do |str, i|
-                    x = str.slice! @width..nil
-                    msg.insert i + 1, x if x && !x.empty?
+        def Output.refresh(win, force: false)
+            #TODO add scroll bar
+            changed_output = @generators.length != @old_generators_length
+            changed_size = @changed_size
+            scrolled = @scroll != @old_scroll
+            return false unless changed_output || changed_size || scrolled || force
+            if changed_size || force
+                scroll = @scroll.clone
+                @display = []
+                @generators.each do |gen|
+                    lines = gen.call
+                    next unless lines
+                    @display += lines
                 end
-                msg.reverse_each do |str|
-                    out.unshift str unless scroll > 0
-                    scroll -= 1 if scroll > 0
-                    break if out.length >= @height
+                @scroll = [[@scroll, @display.length - @height].min, 0].max
+                win.clear
+                win.setpos [@height - @display.length, 0].max, 0
+                s = [@display.length - @height - @scroll, 0].max
+                e = @display.length - @scroll - 1
+                win.addstr @display[s..e] * "\n"
+            elsif changed_output
+                @scroll = 0
+                new_lines = 0
+                @generators[@old_generators_length..nil].each do |gen|
+                    lines = gen.call
+                    @display += lines
+                    new_lines += lines.length
                 end
+                win.scrl new_lines
+                win.setpos [@height - new_lines, 0].max, 0
+                s = @display.length - [new_lines, @height].min
+                win.addstr @display[s..nil] * "\n"
+            elsif scrolled
+                amount = @old_scroll - @scroll
+                s = [@display.length - @height - @scroll, 0].max
+                e = @display.length - @scroll - 1
+                c = 0
+                if amount > 0
+                    s = [e - amount + 1, s].max
+                    c = @height - e + s - 1
+                else
+                    e = [s - amount - 1, e].min
+                end
+                win.scrl amount
+                win.setpos c, 0
+                win.addstr @display[s..e] * "\n"
             end
-            win.clear
-            out.reverse_each.with_index do |line, i|
-                win.setpos @height - i - 1, 0
-                win.addstr line
-            end
+            @old_generators_length = @generators.length
+            @changed_size = false
+            @old_scroll = @scroll
             return true
         end
 
         def Output.print(msg)
-            return unless msg.is_a? Proc
-            return unless msg.lambda?
-            @output.push msg
-            @scroll = 0
-            @changed = true
+            return unless msg.is_a?(Proc) && msg.lambda?
+            @generators.push(
+                -> do
+                    var = msg.call(@width).clone
+                    var = [var] if var.is_a? String
+                    return nil unless var.is_a? Array
+                    var = (var * "\n").split "\n"
+                    var.each.with_index do |str, i|
+                        x = str.slice! @width..nil #TODO better line break algorithm
+                        var.insert i + 1, x if x && !x.empty?
+                    end
+                    return var
+                end,
+            )
         end
 
-        def Output.scroll(amount)
-            @scroll = [@scroll - amount, 0].max
-            @changed = true
+        def Output.scroll(amount = 0, &provider)
+            amount = provider.call @height if provider
+            return if amount == 0
+            @scroll = [[@scroll - amount, @display.length - @height].min, 0].max
         end
     end
 
@@ -283,6 +325,12 @@ dispatcher.register(
                 .executes { |ctx| UI.print_raw ctx[:str] },
         )
         .executes { UI.print_raw "" },
+)
+dispatcher.register(
+    literal("exit").executes do
+        Curses.close_screen
+        exit
+    end,
 )
 UI.returns_to do |str|
     begin
