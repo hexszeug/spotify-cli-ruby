@@ -30,8 +30,17 @@ module UI
         while ch = @win.get_char
             Input.read ch
         end
-        # if scroll
-        Input.refresh @win
+        # refresh curses buffer
+        o = Output.refresh @wout
+        i = Input.refresh @win
+        # draw curses buffer if changed
+        @wout.noutrefresh if o
+        @win.refresh if i || o
+    end
+
+    def UI.print_raw(str)
+        str = str.to_s unless str.is_a? String
+        Output.print ->(width) { str }
     end
 
     def UI.returns_to(&listener)
@@ -44,6 +53,7 @@ module UI
         Curses.clear
         Curses.refresh
         Input.on_resize @win
+        Output.on_resize @wout
     end
 
     def self.on_return(str)
@@ -94,7 +104,7 @@ module UI
         end
 
         def Input.refresh(win)
-            return unless @changed
+            return false unless @changed
             @changed = false
             s = @cursor - @display_cursor
             e = s + @display_size
@@ -102,7 +112,7 @@ module UI
             win.setpos 0, 0
             win.addstr @string[s...e]
             win.setpos 0, @display_cursor
-            win.refresh
+            return true
         end
 
         def Input.read(ch)
@@ -169,6 +179,8 @@ module UI
                 @string.clear
                 @history_pointer = @history.length - 1
                 move_cursor 0
+            when 0x237 #CTRL+UP
+            when 0x20e #CTRL+DOWN
             when 0x109 #F1 #TODO temporary exit
                 Curses.close_screen
                 exit
@@ -196,17 +208,74 @@ module UI
         end
     end
 
+    module Output
+        @output = []
+        @scroll = 0
+        @height = 0
+        @width = 0
+        @changed = false
+
+        def Output.on_resize(win)
+            h = win.maxy
+            w = win.maxx
+            return if @height == h && @width == w
+            @changed = true
+            @height = h
+            @width = w
+        end
+
+        def Output.refresh(win)
+            return false unless @changed
+            @changed = false
+            #TODO implement scrolling
+            out = []
+            @output.reverse_each do |gen|
+                msg = gen.call @width
+                msg = [msg] if msg.is_a? String
+                next unless msg.is_a? Array
+                msg.each.with_index do |str, i|
+                    x = str.slice! @width..nil
+                    msg.insert i + 1, x if x
+                end
+                out = msg + out
+                if out.length >= @height
+                    out.shift out.length - @height
+                    break
+                end
+            end
+            win.clear
+            out.reverse_each.with_index do |line, i|
+                win.setpos @height - i - 1, 0
+                win.addstr line
+            end
+            return true
+        end
+
+        def Output.print(msg)
+            return unless msg.is_a? Proc
+            return unless msg.lambda?
+            @output.push msg
+            @changed = true
+        end
+    end
+
     init
 end
 
 require "./command"
-dispatcher = Command::CommandDispatcher.new
+include Command
+dispatcher = CommandDispatcher.new
+dispatcher.register(
+    literal("echo")
+        .then(argument(:str).executes { |ctx| UI.print_raw ctx[:str] })
+        .executes { UI.print_raw "" },
+)
 UI.returns_to do |str|
     begin
         dispatcher.execute str
-    rescue Command::CommandError => e
-        Curses.close_screen #TODO output command error messages
-        puts e
+    rescue CommandError => e
+        UI.print_raw e.msg
     end
 end
+UI.print_raw "Welcome to the Ruby Spotify CLI"
 loop { UI.tick }
