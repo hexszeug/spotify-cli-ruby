@@ -34,12 +34,21 @@ module UI
         Input.refresh @win
     end
 
+    def UI.returns_to(&listener)
+        @return_listener = listener
+    end
+
     def self.on_resize
         Utils.resize_window @win, 1, -2, -1, -2
         Utils.resize_window @wout, 1, 1, -1, -4
         Curses.clear
         Curses.refresh
         Input.on_resize @win
+    end
+
+    def self.on_return(str)
+        return unless @return_listener.is_a? Proc
+        @return_listener.call str
     end
 
     module Utils
@@ -66,6 +75,8 @@ module UI
         @string = ""
         @cursor = 0
         @display_cursor = 0
+        @history = [@string]
+        @history_pointer = 0
         @changed = false
         @display_size = 0
 
@@ -140,14 +151,25 @@ module UI
             when Curses::KEY_END
                 return unless @cursor < @string.length
                 move_cursor @string.length
+            when UP
+                return unless @history_pointer > 0
+                @history_pointer -= 1
+                @string = @history[@history_pointer].clone
+                move_cursor @string.length
+            when DOWN
+                return unless @history_pointer < @history.length - 1
+                @history_pointer += 1
+                @string = @history[@history_pointer]
+                @string = @string.clone if @history_pointer < @history.length - 1
+                move_cursor @string.length
             when ENTER, "\n", "\r"
                 return if @string.empty?
-                @changed = true #TODO remove (clean code)
-                str = @string
-                @string = ""
-                @cursor = 0
-                @display_cursor = 0
-                return str #TODO would cause errors if ^ was removed
+                UI.on_return @string.clone
+                @history[-1] = @string.clone
+                @history.push @string
+                @string.clear
+                @history_pointer = @history.length - 1
+                move_cursor 0
             when 0x109 #F1 #TODO temporary exit
                 Curses.close_screen
                 exit
@@ -178,4 +200,14 @@ module UI
     init
 end
 
+require "./command"
+dispatcher = Command::CommandDispatcher.new
+UI.returns_to do |str|
+    begin
+        dispatcher.execute str
+    rescue Command::CommandError => e
+        Curses.close_screen #TODO output command error messages
+        puts e
+    end
+end
 loop { UI.tick }
