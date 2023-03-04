@@ -16,6 +16,7 @@ GEM
       reline (>= 0.3.0)
     launchy (2.5.2)
       addressable (~> 2.8)
+    power_assert (2.0.3)
     prettier_print (1.2.0)
     public_suffix (5.0.1)
     rbs (2.8.4)
@@ -32,6 +33,8 @@ GEM
       rbs
       syntax_tree (>= 2.0.1)
     temple (0.10.0)
+    test-unit (3.5.7)
+      power_assert
     thor (1.2.1)
     tilt (2.1.0)
     webrick (1.8.1)
@@ -47,6 +50,7 @@ DEPENDENCIES
   syntax_tree
   syntax_tree-haml
   syntax_tree-rbs
+  test-unit
   webrick
 
 BUNDLED WITH

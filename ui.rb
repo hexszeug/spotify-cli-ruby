@@ -267,7 +267,11 @@ include Command
 dispatcher = CommandDispatcher.new
 dispatcher.register(
     literal("echo")
-        .then(argument(:str).executes { |ctx| UI.print_raw ctx[:str] })
+        .then(
+            Arguments::GreedyString
+                .new(:str)
+                .executes { |ctx| UI.print_raw ctx[:str] },
+        )
         .executes { UI.print_raw "" },
 )
 UI.returns_to do |str|

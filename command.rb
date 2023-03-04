@@ -297,6 +297,8 @@ module Command
                 super "parser cannot distinguish between #{node[1].display_name} and #{node[0].display_name} (cannot be added to #{parent.display_name})"
             when :not_a_node
                 super "#{nodes[0]} is not a node"
+            else
+                super "#{type} error occured adding #{nodes[0].display_name} to #{parent.display_name}"
             end
         end
     end
@@ -341,6 +343,27 @@ module Command
 
         def context
             @context
+        end
+    end
+
+    module Arguments
+        class GreedyString < CommandNode
+            def initialize(name)
+                super :argument, name
+            end
+
+            def then(node)
+                raise BuildingError.new "child-of-greedy", self, node
+            end
+
+            def dispatch(context)
+                value = []
+                (context.cmd.length - context.nodes.length).times do
+                    context.track_node self
+                    value.push context.last_tracked_token
+                end
+                context[@name] = parse(value * " ")
+            end
         end
     end
 end
