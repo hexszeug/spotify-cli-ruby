@@ -108,7 +108,6 @@ module UI
         def Input.read(ch)
             #TODO suggestions (TAB Arrow Up/Down, maybe PPAGE, NPAGE)
             #TODO insert-mode
-            #TODO history
             case ch
             when RESIZE
                 UI.on_resize

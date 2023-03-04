@@ -11,21 +11,21 @@ module Command
         def initialize(type, name)
             case type
             when :root
-                unless name == ''
-                    raise ArgumentError.new 'name of root must be empty string'
+                unless name == ""
+                    raise ArgumentError.new "name of root must be empty string"
                 end
             when :literal
                 name = name.to_s
                 unless name =~ /^\S+$/
-                    raise ArgumentError.new 'name of literal cannot contain whitespaces'
+                    raise ArgumentError.new "name of literal cannot contain whitespaces"
                 end
             when :argument
                 name = name.to_s unless name.is_a? Symbol
             else
                 raise ArgumentError.new "#{type} is not a command node type"
             end
-            if type != :root && name == ''
-                raise ArgumentError.new 'name of non root notes cannot be empty sting'
+            if type != :root && name == ""
+                raise ArgumentError.new "name of non root notes cannot be empty sting"
             end
             @type = type
             @name = name
@@ -53,7 +53,7 @@ module Command
             when :argument
                 "<#{@name.to_s}>"
             else
-                ''
+                ""
             end
         end
 
@@ -181,7 +181,7 @@ module Command
 
     class CommandDispatcher
         def initialize
-            @root = CommandNode.new :root, ''
+            @root = CommandNode.new :root, ""
         end
 
         def register(node)
@@ -195,7 +195,6 @@ module Command
                 complete_token = context.last_tracked_token
             rescue ParsingError => e
                 context = e.context
-                #TODO multiple empty args
                 case e.type
                 when :missing_arg # "<--HERE" / "command<--HERE"
                     node = context.nodes[-2]
@@ -209,10 +208,13 @@ module Command
                 end
             end
             node = @root unless node
-            complete_token = '' unless complete_token
+            complete_token = "" unless complete_token
             sugs = node.suggest(context)
             sugs.filter! { |sug| sug.start_with? complete_token }
-            raise e if sugs.empty?
+            if sugs.empty?
+                raise e if e
+                node.parse node unless node.valid? node
+            end
             sugs.sort
         end
 
@@ -224,7 +226,7 @@ module Command
         private
 
         def parse(str)
-            cmd = str.split /\s/, -1 #TODO handle consecutive spaces
+            cmd = str.split /\s/, -1
             context = CommandContext.new cmd
             @root.dispatch context
             context
@@ -312,10 +314,10 @@ module Command
 
     class ParsingError < CommandError
         def initialize(type, context)
-            cmd_str = context.cmd * ' '
+            cmd_str = context.cmd * " "
             cmd_snippet = ->(length, cmd: nil) do
                 cmd = cmd_str unless cmd
-                cmd.length <= length ? cmd : '...' + cmd[-length..-1]
+                cmd.length <= length ? cmd : "..." + cmd[-length..-1]
             end
             case type
             when :incorrect_arg
@@ -323,9 +325,9 @@ module Command
             when :missing_arg
                 super "incomplete command: #{cmd_snippet.call 15}<--HERE"
             when :invalid_context
-                super 'tried executing improperly parsed command. this is a bug and should not happen. please report'
+                super "tried executing improperly parsed command. this is a bug and should not happen. please report"
             when :invalid_token
-                super "malformed argument #{context.last_tracked.display_name}: #{cmd_snippet.call 15, cmd: context.cmd[0...context.nodes.length] * ' '}<--HERE"
+                super "malformed argument #{context.last_tracked.display_name}: #{cmd_snippet.call 15, cmd: context.cmd[0...context.nodes.length] * " "}<--HERE"
             else
                 super type
             end
