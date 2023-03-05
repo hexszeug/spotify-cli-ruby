@@ -291,15 +291,22 @@ module UI
             return unless msg.is_a?(Proc) && msg.lambda?
             @generators.push(
                 -> do
-                    var = msg.call(@width).clone
-                    var = [var] if var.is_a? String
-                    return nil unless var.is_a? Array
-                    var = (var * "\n").split "\n"
-                    var.each.with_index do |str, i|
-                        x = str.slice! @width..nil #TODO better line break algorithm
-                        var.insert i + 1, x if x && !x.empty?
+                    lines = msg.call(@width).clone
+                    lines = [lines] if lines.is_a? String
+                    return nil unless lines.is_a? Array
+                    lines = (lines * "\n").split "\n"
+                    lines.each.with_index do |line, i|
+                        next unless line.length > @width
+                        e = line.rindex /\s/, @width
+                        e = @width unless e
+                        s = line.index(/\S/, e) - e
+                        new_line = line.slice! e...line.length
+                        next unless s && new_line
+                        new_line.slice! 0...s
+                        next if new_line.empty?
+                        lines.insert i + 1, new_line
                     end
-                    return var
+                    return lines
                 end,
             )
         end
