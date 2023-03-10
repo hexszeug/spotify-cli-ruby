@@ -15,8 +15,13 @@ module Spotify
     end
 
     module Token
+        include WEBrick
+
         TOKEN_DIR = Dir.home + "/.spotify-cli-ruby"
         TOKEN_PATH = TOKEN_DIR + "/token.json"
+
+        SUCCESS_HTML_PATH = Dir.pwd + "/static/success.html"
+        ERROR_HTML_PATH = Dir.pwd + "/static/error.html"
 
         APP_ID = "4388096316894b88a147b53559d0c14a"
         APP_SECRET = "77f2373853974699824602358ecdf9bd"
@@ -55,7 +60,7 @@ module Spotify
                         end
                         callback.call nil
                     end
-                @getting_token.name = "getting token main"
+                @getting_token.name = "getting token: main"
                 return true
             end
             @getting_token = true unless @getting_token
@@ -70,7 +75,7 @@ module Spotify
         end
 
         def Token.cancel_new_token
-            return unless @getting_token.is_a? Thread && @getting_token.alive?
+            return unless @getting_token.is_a?(Thread) && @getting_token.alive?
             @getting_token.raise AuthManualCanceledError.new
         end
 
@@ -143,56 +148,124 @@ module Spotify
             end
 
             # get response
+            # start timeout thread
+            timeout_thread =
+                Thread.new(Thread.current) do |thread|
+                    sleep PROMPT_TIMEOUT_SEC
+                    thread.raise AuthTimeoutedError.new
+                end
+            timeout_thread.name = "getting token: timeout"
+
+            # start code-server
             begin
                 redirect_uri = URI(Spotify::URLs::AUTH_REDIRECT)
-                server_thread =
-                    Thread.new(
-                        redirect_uri.hostname,
-                        redirect_uri.port,
-                    ) do |hostname, port|
-                        Timeout.timeout(PROMPT_TIMEOUT_SEC, AuthTimeoutedError) do
-                            Socket.tcp_server_loop(hostname, port) do |socket|
-                                begin
-                                    #TODO parse code response
-                                    socket.close
-                                    break "testcode"
-                                rescue AuthCanceledError => e
-                                    socket.close
-                                    raise e
-                                ensure
-                                    socket.close
+                hostname, port, path =
+                    redirect_uri.hostname,
+                    redirect_uri.port,
+                    redirect_uri.path
+                threads = []
+                sockets = []
+                Socket.tcp_server_loop(hostname, port) do |socket|
+                    sockets.push socket
+                    thread =
+                        Thread.new(socket, Thread.current) do |socket, thread|
+                            begin
+                                req = HTTPRequest.new Config::HTTP
+                                res = HTTPResponse.new Config::HTTP
+                                req.parse socket
+                                raise HTTPStatus::NoContent.new if req.path != path
+                                query = req.query
+                                unless query.key?("state")
+                                    raise WrongOrMissingState.new "missing state"
                                 end
+                                unless query["state"] == state
+                                    raise WrongOrMissingState.new "wrong state `#{query["state"]}'"
+                                end
+                                if query.key?("error")
+                                    if query["error"] == "access_denied"
+                                        raise UserDeniedAccessError.new
+                                    end
+                                    raise AuthSpotifyOrUserError.new query["error"]
+                                end
+                                raise MissingCodeError.new unless query.key?("code")
+                                # code received
+                                send_response res, socket
+                                thread.raise ReceivedCodeSignal.new query["code"]
+                            rescue HTTPStatus::EOFError
+                                socket.close
+                            rescue AuthReportableError => e
+                                send_response res, socket, e
+                                thread.raise e
+                            rescue HTTPStatus::Status => status
+                                send_response res, socket, status
                             end
                         end
-                    end
-                server_thread.name = "getting token receiving code server"
-                server_thread.report_on_exception = false
-                server_thread.join
+                    threads.push thread
+                    thread.name =
+                        "getting token: code-server request no. #{threads.length}"
+                end
             rescue SystemCallError => e
-                # creation of tcp server failed (probably the port was blocked)
-                # is passed to this thread through server_thread.join
-                # (even when invoked before calling join)
-                raise ReceiveCodeError.new e.message
-            rescue AuthManualCanceledError => e
-                # can be invoked on this thread ("getting token main") by any thread
-                # pass exception to server_thread to close potential tcp connections
-                # also kills server_thread and join passes exception back to this thread
-                server_thread.raise e
-                server_thread.join 1
-                # manually kill server_thread if it failed to stop executing
-                # also manually reraise the exception
-                server_thread.kill
+                timeout_thread.kill
+                raise OpenCodeServerError.new e.message
+            rescue AuthCanceledError => e
+                timeout_thread.kill
+                threads.each &:kill
+                sockets.each &:close
                 raise e
+            rescue ReceivedCodeSignal => code
+                timeout_thread.kill
+                threads.each &:kill
+                sockets.each &:close
+                return code.to_s
             end
+        end
 
-            # return code
-            return server_thread.value
+        def self.send_response(res, socket, status = nil)
+            return if socket.closed?
+            if status
+                res.status = status.code
+                res.body = generate_error_page status if HTTPStatus.error? status.code
+            else
+                res.body = generate_success_page
+                res.status = HTTPStatus::RC_OK
+            end
+            res.keep_alive = false
+            res.send_response socket
+            socket.close
+        end
+
+        def self.generate_success_page
+            unless File.exist? SUCCESS_HTML_PATH
+                return "Done! You may close this tab now."
+            end
+            return File.read SUCCESS_HTML_PATH
+        end
+
+        def self.generate_error_page(error)
+            unless File.exist? ERROR_HTML_PATH
+                return "#{error.status} #{error.reason_phrase}"
+            end
+            page = File.read ERROR_HTML_PATH
+            page.gsub! "$error_code", error.code.to_s
+            page.gsub! "$error_name", error.reason_phrase
+            page.gsub! "$error_message", error.message.sub("\n", "\\n")
+            return page
         end
 
         def self.request_token(code)
         end
 
         def self.refresh_token
+        end
+
+        class ReceivedCodeSignal < Exception
+            def initialize(code)
+                @code = code
+            end
+
+            def to_s
+                @code
+            end
         end
     end
 
@@ -202,10 +275,49 @@ module Spotify
     class OpenUserPromptError < OAuth2Error
     end
 
-    class ReceiveCodeError < OAuth2Error
+    class OpenCodeServerError < OAuth2Error
     end
 
-    class UserDeniedAccessError < OAuth2Error
+    class AuthReportableError < OAuth2Error
+        def code
+            WEBrick::HTTPStatus::RC_INTERNAL_SERVER_ERROR
+        end
+
+        def reason_phrase
+            WEBrick::HTTPStatus.reason_phrase code
+        end
+    end
+
+    class AuthSpotifyOrUserError < AuthReportableError
+        def initialize(msg = "", real_msg: nil)
+            super real_msg ? real_msg : "Spotify\u24c7 error message: `#{msg}'"
+        end
+
+        def code
+            WEBrick::HTTPStatus::RC_BAD_REQUEST
+        end
+    end
+
+    class UserDeniedAccessError < AuthSpotifyOrUserError
+        def initialize(msg = nil)
+            super real_msg: msg ? msg : "user denied access"
+        end
+    end
+
+    class WrongOrMissingState < AuthReportableError
+        def code
+            WEBrick::HTTPStatus::RC_UNAUTHORIZED
+        end
+    end
+
+    class MissingCodeError < AuthReportableError
+        def initialize(msg = nil)
+            super msg ? msg : "missing code"
+        end
+
+        def code
+            WEBrick::HTTPStatus::RC_BAD_REQUEST
+        end
     end
 
     class AuthCanceledError < OAuth2Error
@@ -220,4 +332,4 @@ end
 
 Spotify::Token.new_token { |error| puts error }
 
-loop { Spotify::Token.cancel_new_token if gets == "!" }
+loop { Spotify::Token.cancel_new_token if gets == "!\n" }
