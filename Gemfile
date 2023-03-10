@@ -9,4 +9,6 @@ gem "syntax_tree-rbs", require: false
 gem "launchy"
 gem "webrick"
 gem "curses"
+gem "faraday"
+
 gem "test-unit"

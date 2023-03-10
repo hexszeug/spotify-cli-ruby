@@ -7,6 +7,10 @@ GEM
     debug (1.7.1)
       irb (>= 1.5.0)
       reline (>= 0.3.1)
+    faraday (2.7.4)
+      faraday-net_http (>= 2.0, < 3.1)
+      ruby2_keywords (>= 0.0.4)
+    faraday-net_http (3.0.2)
     haml (6.1.1)
       temple (>= 0.8.2)
       thor
@@ -22,6 +26,7 @@ GEM
     rbs (2.8.4)
     reline (0.3.2)
       io-console (~> 0.5)
+    ruby2_keywords (0.0.5)
     syntax_tree (6.0.0)
       prettier_print (>= 1.2.0)
     syntax_tree-haml (3.0.0)
@@ -45,6 +50,7 @@ PLATFORMS
 DEPENDENCIES
   curses
   debug
+  faraday
   launchy
   prettier_print
   syntax_tree
