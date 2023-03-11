@@ -6,6 +6,8 @@ require "securerandom"
 require "launchy"
 require "webrick"
 
+#TODO refactor "begin rescue" to make use of "ensure" more often and to use "rescue; raise" instead of "rescue => e; raise e"
+
 module Spotify
     PROMPT_TIMEOUT_SEC = 5 * 60
 
@@ -22,6 +24,8 @@ module Spotify
 
         SUCCESS_HTML_PATH = Dir.pwd + "/static/success.html"
         ERROR_HTML_PATH = Dir.pwd + "/static/error.html"
+
+        HTTP_SERVER_CONFIG = Config::HTTP.update(Logger: BasicLog.new(nil, 0))
 
         APP_ID = "4388096316894b88a147b53559d0c14a"
         APP_SECRET = "77f2373853974699824602358ecdf9bd"
@@ -66,11 +70,9 @@ module Spotify
             @getting_token = true unless @getting_token
             begin
                 set_token request_token get_code
-            rescue OAuth2Error => e
+            ensure
                 @getting_token = false
-                raise e
             end
-            @getting_token = false
             return @token[:access_token].dup
         end
 
@@ -105,6 +107,8 @@ module Spotify
             @token = token
             return true
         end
+
+        #TODO split "get_code" in multiple methods for better code readability
 
         def self.get_code
             # generate state
@@ -170,8 +174,8 @@ module Spotify
                     thread =
                         Thread.new(socket, Thread.current) do |socket, thread|
                             begin
-                                req = HTTPRequest.new Config::HTTP
-                                res = HTTPResponse.new Config::HTTP
+                                req = HTTPRequest.new HTTP_SERVER_CONFIG
+                                res = HTTPResponse.new HTTP_SERVER_CONFIG
                                 req.parse socket
                                 raise HTTPStatus::NoContent.new if req.path != path
                                 query = req.query
@@ -226,11 +230,20 @@ module Spotify
                 res.status = status.code
                 res.body = generate_error_page status if HTTPStatus.error? status.code
             else
-                res.body = generate_success_page
                 res.status = HTTPStatus::RC_OK
+                res.body = generate_success_page
             end
+            res.content_type =
+                "text/html; charset=#{res.body.encoding.name}" if res.body
             res.keep_alive = false
-            res.send_response socket
+            # force WEBrick to don't add server header
+            res.setup_header
+            res.header.delete "server"
+            begin
+                res.send_header socket
+                res.send_body socket
+            rescue Exception
+            end
             socket.close
         end
 
@@ -330,6 +343,10 @@ module Spotify
     end
 end
 
-Spotify::Token.new_token { |error| puts error }
+#TODO remove testing script
 
-loop { Spotify::Token.cancel_new_token if gets == "!\n" }
+if caller.length == 0
+    Spotify::Token.new_token { |error| puts error }
+
+    loop { Spotify::Token.cancel_new_token if gets == "!\n" }
+end

@@ -1,5 +1,7 @@
-require_relative "errors.rb"
-require_relative "auth.rb"
-
 module Spotify
+    class SpotifyError < StandardError
+    end
 end
+
+require_relative "auth.rb"
+require_relative "request.rb"
