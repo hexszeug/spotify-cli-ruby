@@ -6,13 +6,11 @@ require "securerandom"
 require "launchy"
 require "webrick"
 
-#TODO refactor "begin rescue" to make use of "ensure" more often and to use "rescue; raise" instead of "rescue => e; raise e"
-
 module Spotify
     PROMPT_TIMEOUT_SEC = 5 * 60
 
     module URLs
-        AUTH_PROPT = "https://accounts.spotify.com/authorize/"
+        AUTH_PROMPT = "https://accounts.spotify.com/authorize/"
         AUTH_REDIRECT = "http://localhost:8888/callback/"
     end
 
@@ -58,13 +56,12 @@ module Spotify
                 @getting_token =
                     Thread.new callback do |callback|
                         begin
-                            new_token
+                            callback.call new_token
                         rescue OAuth2Error => e
                             callback.call e
                         end
-                        callback.call nil
                     end
-                @getting_token.name = "getting token: main"
+                @getting_token.name = "getting-token"
                 return true
             end
             @getting_token = true unless @getting_token
@@ -108,120 +105,117 @@ module Spotify
             return true
         end
 
-        #TODO split "get_code" in multiple methods for better code readability
-
         def self.get_code
-            # generate state
             state = SecureRandom.hex 16
 
             # open prompt
-            query =
-                URI.encode_www_form(
-                    {
-                        client_id: APP_ID,
-                        response_type: "code",
-                        redirect_uri: Spotify::URLs::AUTH_REDIRECT,
-                        state: state,
-                        scope:
-                            %w[
-                                ugc-image-upload
-                                user-read-playback-state
-                                user-modify-playback-state
-                                playlist-read-private
-                                user-follow-modify
-                                playlist-read-collaborative
-                                user-follow-read
-                                user-read-currently-playing
-                                user-read-playback-position
-                                user-library-modify
-                                playlist-modify-private
-                                playlist-modify-public
-                                user-read-email
-                                user-top-read
-                                user-read-recently-played
-                                user-read-private
-                                user-library-read
-                            ] * " ",
-                        show_dialog: true,
-                    },
-                )
+            uri = URI(Spotify::URLs::AUTH_PROMPT)
+            query = {
+                client_id: APP_ID,
+                response_type: "code",
+                redirect_uri: Spotify::URLs::AUTH_REDIRECT,
+                state: state,
+                scope:
+                    %w[
+                        ugc-image-upload
+                        user-read-playback-state
+                        user-modify-playback-state
+                        playlist-read-private
+                        user-follow-modify
+                        playlist-read-collaborative
+                        user-follow-read
+                        user-read-currently-playing
+                        user-read-playback-position
+                        user-library-modify
+                        playlist-modify-private
+                        playlist-modify-public
+                        user-read-email
+                        user-top-read
+                        user-read-recently-played
+                        user-read-private
+                        user-library-read
+                    ] * " ",
+                show_dialog: true,
+            }
+            uri.query = URI.encode_www_form(query)
             begin
-                Launchy.open Spotify::URLs::AUTH_PROPT + "?" + query
+                Launchy.open uri.to_s
             rescue Launchy::Error => e
                 raise OpenUserPromptError.new e.message
             end
 
-            # get response
-            # start timeout thread
-            timeout_thread =
-                Thread.new(Thread.current) do |thread|
-                    sleep PROMPT_TIMEOUT_SEC
-                    thread.raise AuthTimeoutedError.new
-                end
-            timeout_thread.name = "getting token: timeout"
+            # setup server variables
+            redirect_uri = URI(Spotify::URLs::AUTH_REDIRECT)
+            hostname, port = redirect_uri.hostname, redirect_uri.port
+            threads = []
+            sockets = []
 
-            # start code-server
             begin
-                redirect_uri = URI(Spotify::URLs::AUTH_REDIRECT)
-                hostname, port, path =
-                    redirect_uri.hostname,
-                    redirect_uri.port,
-                    redirect_uri.path
-                threads = []
-                sockets = []
+                # start timeout thread
+                timeout_thread =
+                    Thread.new(Thread.current) do |thread|
+                        sleep PROMPT_TIMEOUT_SEC
+                        thread.raise AuthTimeoutedError.new
+                    end
+                timeout_thread.name = "getting token/code-server (timeout)"
+
+                # server loop
                 Socket.tcp_server_loop(hostname, port) do |socket|
                     sockets.push socket
                     thread =
-                        Thread.new(socket, Thread.current) do |socket, thread|
+                        Thread.new(Thread.current) do |server_thread|
                             begin
-                                req = HTTPRequest.new HTTP_SERVER_CONFIG
-                                res = HTTPResponse.new HTTP_SERVER_CONFIG
-                                req.parse socket
-                                raise HTTPStatus::NoContent.new if req.path != path
-                                query = req.query
-                                unless query.key?("state")
-                                    raise WrongOrMissingState.new "missing state"
-                                end
-                                unless query["state"] == state
-                                    raise WrongOrMissingState.new "wrong state `#{query["state"]}'"
-                                end
-                                if query.key?("error")
-                                    if query["error"] == "access_denied"
-                                        raise UserDeniedAccessError.new
-                                    end
-                                    raise AuthSpotifyOrUserError.new query["error"]
-                                end
-                                raise MissingCodeError.new unless query.key?("code")
-                                # code received
-                                send_response res, socket
-                                thread.raise ReceivedCodeSignal.new query["code"]
-                            rescue HTTPStatus::EOFError
-                                socket.close
-                            rescue AuthReportableError => e
-                                send_response res, socket, e
-                                thread.raise e
-                            rescue HTTPStatus::Status => status
-                                send_response res, socket, status
+                                code = parse_code_server_request socket, state
+                            rescue OAuth2Error => e
+                                server_thread.raise e
                             end
+                            server_thread.raise ReceivedCodeSignal.new code if code
                         end
                     threads.push thread
-                    thread.name =
-                        "getting token: code-server request no. #{threads.length}"
+                    thread.name = "getting-token/code-server: client #{socket}"
                 end
             rescue SystemCallError => e
-                timeout_thread.kill
                 raise OpenCodeServerError.new e.message
-            rescue AuthCanceledError => e
-                timeout_thread.kill
-                threads.each &:kill
-                sockets.each &:close
-                raise e
             rescue ReceivedCodeSignal => code
+                return code.to_s
+            ensure
                 timeout_thread.kill
                 threads.each &:kill
                 sockets.each &:close
-                return code.to_s
             end
+        end
+
+        def self.parse_code_server_request(socket, state)
+            begin
+                req = HTTPRequest.new HTTP_SERVER_CONFIG
+                res = HTTPResponse.new HTTP_SERVER_CONFIG
+                req.parse socket
+                if req.path != URI(Spotify::URLs::AUTH_REDIRECT).path
+                    raise HTTPStatus::NoContent.new
+                end
+                query = req.query
+                raise WrongOrMissingState.new "missing state" unless query.key?("state")
+                unless query["state"] == state
+                    raise WrongOrMissingState.new "wrong state `#{query["state"]}'"
+                end
+                if query.key?("error")
+                    raise UserDeniedAccessError.new if query["error"] == "access_denied"
+                    raise AuthSpotifyOrUserError.new query["error"]
+                end
+                raise MissingCodeError.new unless query.key?("code")
+                # code received
+                send_response res, socket
+                return query["code"]
+            rescue HTTPStatus::EOFError
+            rescue AuthReportableError => e
+                send_response res, socket, e
+                raise e
+            rescue HTTPStatus::Status => e
+                send_response res, socket, e
+            ensure
+                socket.close
+            end
+            return nil
         end
 
         def self.send_response(res, socket, status = nil)
@@ -236,15 +230,13 @@ module Spotify
             res.content_type =
                 "text/html; charset=#{res.body.encoding.name}" if res.body
             res.keep_alive = false
-            # force WEBrick to don't add server header
             res.setup_header
-            res.header.delete "server"
+            res.header.delete "server" # is generated by setup_header
             begin
                 res.send_header socket
                 res.send_body socket
             rescue Exception
             end
-            socket.close
         end
 
         def self.generate_success_page
@@ -261,7 +253,9 @@ module Spotify
             page = File.read ERROR_HTML_PATH
             page.gsub! "$error_code", error.code.to_s
             page.gsub! "$error_name", error.reason_phrase
-            page.gsub! "$error_message", error.message.sub("\n", "\\n")
+            msg = error.message.sub("\n", "\\n")
+            msg = "" if msg == error.class.name
+            page.gsub! "$error_message", msg
             return page
         end
 

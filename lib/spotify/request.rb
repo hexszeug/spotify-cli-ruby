@@ -18,7 +18,7 @@ module Spotify
             timeout: DEFAULT_TIMEOUT,
             &callback
         )
-            name = "#{method.to_s.upcase} request to #{uri}"
+            name = "request/#{method.to_s.upcase} request to #{uri}"
             if callback
                 thread =
                     Thread.new(callback) do |callback|
