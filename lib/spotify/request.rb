@@ -7,6 +7,12 @@ require "net/http"
 # use persistent tcp connection
 
 module Spotify
+    module MIME
+        POST_FORM = "application/x-www-form-urlencoded"
+        HTML = "text/html"
+        JSON = "application/json"
+    end
+
     module Request
         DEFAULT_TIMEOUT = 10
 
@@ -65,11 +71,13 @@ module Spotify
             req = req_class.new uri, header
             req.delete "user-agent"
             begin
-                Net::HTTP.start(
-                    uri.hostname,
-                    uri.port,
-                    use_ssl: uri.scheme == "https",
-                ) { |http_connection| return http_connection.request req, body }
+                res =
+                    Net::HTTP.start(
+                        uri.hostname,
+                        uri.port,
+                        use_ssl: uri.scheme == "https",
+                    ) { |http_connection| http_connection.request req, body }
+                res.read_body
             rescue SystemCallError, IOError, OpenSSL::SSL::SSLError => e
                 raise ConnectionError.new uri, method, header, body, e.message
             rescue Net::HTTPBadResponse, Net::HTTPUnknownResponse => e
@@ -77,6 +85,7 @@ module Spotify
             rescue Timeout::Error => e
                 raise TimeoutError.new uri, method, header, body, e.message
             end
+            return res
         end
     end
 

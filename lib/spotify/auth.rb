@@ -2,20 +2,24 @@ require_relative "spotify.rb"
 
 require "uri"
 require "securerandom"
+require "base64"
 
 require "launchy"
 require "webrick"
 
-module Spotify
-    PROMPT_TIMEOUT_SEC = 5 * 60
+#TODO replace "&callback" arguments with "yield", "block_given?" and "&proc" syntax
 
+module Spotify
     module URLs
         AUTH_PROMPT = "https://accounts.spotify.com/authorize/"
         AUTH_REDIRECT = "http://localhost:8888/callback/"
+        AUTH_TOKEN = "https://accounts.spotify.com/api/token/"
     end
 
     module Token
         include WEBrick
+
+        PROMPT_TIMEOUT_SEC = 5 * 60
 
         TOKEN_DIR = Dir.home + "/.spotify-cli-ruby"
         TOKEN_PATH = TOKEN_DIR + "/token.json"
@@ -27,6 +31,10 @@ module Spotify
 
         APP_ID = "4388096316894b88a147b53559d0c14a"
         APP_SECRET = "77f2373853974699824602358ecdf9bd"
+
+        def Token.access_token
+            return @token ? @token[:access_token].dup : nil
+        end
 
         def Token.save_token
             return false unless @token
@@ -44,10 +52,11 @@ module Spotify
             return false unless File.file? TOKEN_PATH
             begin
                 token_hash = JSON.parse File.read(TOKEN_PATH), symbolize_names: true
-            rescue JSON::JSONError
+                set_token token_hash
+            rescue JSON::JSONError, TokenParseError
                 return false
             end
-            return set_token token_hash
+            return true
         end
 
         def Token.new_token(&callback)
@@ -57,7 +66,7 @@ module Spotify
                     Thread.new callback do |callback|
                         begin
                             callback.call new_token
-                        rescue OAuth2Error => e
+                        rescue OAuth2Error, TokenParseError => e
                             callback.call e
                         end
                     end
@@ -66,42 +75,71 @@ module Spotify
             end
             @getting_token = true unless @getting_token
             begin
-                set_token request_token get_code
+                set_token request_token_by_code get_code
             ensure
                 @getting_token = false
             end
-            return @token[:access_token].dup
+            return true
         end
 
         def Token.cancel_new_token
-            return unless @getting_token.is_a?(Thread) && @getting_token.alive?
+            return false unless @getting_token.is_a?(Thread) && @getting_token.alive?
             @getting_token.raise AuthManualCanceledError.new
+            return true
+        end
+
+        def Token.refresh_token(&callback)
+            return false unless @token
+            if callback
+                return(
+                    request_refresh_token(
+                        @token[:refresh_token],
+                        proc do |res|
+                            if res.is_a? Exception
+                                callback.call res
+                            else
+                                begin
+                                    set_token res
+                                rescue TokenParseError => e
+                                    callback.call e
+                                else
+                                    callback.call true
+                                end
+                            end
+                        end,
+                    )
+                )
+            end
+
+            return true
         end
 
         def self.set_token(token_hash)
-            return false unless token_hash.is_a? Hash
+            unless token_hash.is_a? Hash
+                raise TokenParseError.new "token must be a hash"
+            end
             token = token_hash.dup
             token.delete_if do |key|
                 !%i[access_token refresh_token expires_in expires_at].include? key
             end
             unless token.key?(:access_token) && token[:access_token].is_a?(String)
-                return false
+                raise TokenParseError.new "missing access token"
+            end
+            if token.key?(:expires_in) && !token.key?(:expires_at) &&
+                      token[:expires_in].is_a?(Integer)
+                token[:expires_at] = Time.now.to_i + token[:expires_in]
+            end
+            token.delete :expires_in
+            unless token.key?(:expires_at) && token[:expires_at].is_a?(Integer)
+                raise TokenParseError.new "missing expiration infomation"
             end
             unless token.key?(:refresh_token) && token[:refresh_token].is_a?(String)
-                return false
-            end
-            if token.key?(:expires_at) && token[:expires_at].is_a?(Integer)
-                token.delete :expires_in
+                raise TokenParseError.new "missing refresh token" unless @token
+                @token.update token
+            else
                 @token = token
-                refresh_token if Time.now.to_i >= token[:expires_at]
-                return true
             end
-            unless token.key?(:expires_in) && token[:expires_in].is_a?(Integer)
-                return false
-            end
-            token[:expires_at] = Time.now.to_i + token[:expires_in]
-            token.delete :expires_in
-            @token = token
+            refresh_token {} if Time.now.to_i >= token[:expires_at]
             return true
         end
 
@@ -200,7 +238,7 @@ module Spotify
                 end
                 if query.key?("error")
                     raise UserDeniedAccessError.new if query["error"] == "access_denied"
-                    raise AuthSpotifyOrUserError.new query["error"]
+                    raise AuthCodeDenied.new query["error"]
                 end
                 raise MissingCodeError.new unless query.key?("code")
                 # code received
@@ -228,7 +266,7 @@ module Spotify
                 res.body = generate_success_page
             end
             res.content_type =
-                "text/html; charset=#{res.body.encoding.name}" if res.body
+                "#{Spotify::MIME::HTML}; charset=#{res.body.encoding.name}" if res.body
             res.keep_alive = false
             res.setup_header
             res.header.delete "server" # is generated by setup_header
@@ -259,10 +297,66 @@ module Spotify
             return page
         end
 
-        def self.request_token(code)
+        def self.request_token_by_code(code)
+            return(
+                request_token_api(
+                    {
+                        grant_type: "authorization_code",
+                        code: code,
+                        redirect_uri: Spotify::URLs::AUTH_REDIRECT,
+                    },
+                )
+            )
         end
 
-        def self.refresh_token
+        def self.request_refresh_token(refresh_token, callback = nil)
+            return(
+                request_token_api(
+                    { grant_type: "refresh_token", refresh_token: refresh_token },
+                    callback,
+                )
+            )
+        end
+
+        def self.request_token_api(body, callback = nil)
+            uri = URI(Spotify::URLs::AUTH_TOKEN)
+            header = {
+                Authorization:
+                    "Basic #{Base64.strict_encode64(APP_ID + ":" + APP_SECRET)}",
+                "Content-Type": Spotify::MIME::POST_FORM,
+            }
+            req_body = URI.encode_www_form body
+            if callback
+                cancel =
+                    Spotify::Request.http_request(uri, :post, header, req_body) do |res|
+                        parse_token_response res
+                    end
+                return cancel
+            end
+            begin
+                res = Spotify::Request.http_request uri, :post, header, req_body
+            rescue RequestError => e
+                res = e
+            end
+            return parse_token_response res
+        end
+
+        def self.parse_token_response(res)
+            case res
+            when CancelError
+                raise AuthCanceledError.new res.message
+            when TimeoutError
+                raise AuthTimeoutedError.new res.message
+            when RequestError
+                raise AuthTokenRequestError.new res.message
+            end
+            begin
+                body = JSON.parse res.body
+            rescue JSON::JSONError
+                raise AuthTokenRequestError.new "malformed response body"
+            end
+            raise AuthTokenDeniedError.new body[:error] unless res.code == "200"
+            return body
         end
 
         class ReceivedCodeSignal < Exception
@@ -274,6 +368,11 @@ module Spotify
                 @code
             end
         end
+    end
+
+    #TODO rename exception and implement custom behaviour (like only get message if custom provided)
+
+    class TokenParseError < SpotifyError
     end
 
     class OAuth2Error < SpotifyError
@@ -295,7 +394,8 @@ module Spotify
         end
     end
 
-    class AuthSpotifyOrUserError < AuthReportableError
+    class AuthCodeDenied < AuthReportableError
+        #TODO implement handling for codes mentioned in https://www.rfc-editor.org/rfc/rfc6749#section-4.1.2.1
         def initialize(msg = "", real_msg: nil)
             super real_msg ? real_msg : "Spotify\u24c7 error message: `#{msg}'"
         end
@@ -305,7 +405,7 @@ module Spotify
         end
     end
 
-    class UserDeniedAccessError < AuthSpotifyOrUserError
+    class UserDeniedAccessError < AuthCodeDenied
         def initialize(msg = nil)
             super real_msg: msg ? msg : "user denied access"
         end
@@ -327,6 +427,13 @@ module Spotify
         end
     end
 
+    class AuthTokenRequestError < OAuth2Error
+    end
+
+    class AuthTokenDeniedError < OAuth2Error
+        #TODO implement handling for code mentioned in https://www.rfc-editor.org/rfc/rfc6749#section-5.2
+    end
+
     class AuthCanceledError < OAuth2Error
     end
 
@@ -340,7 +447,24 @@ end
 #TODO remove testing script
 
 if caller.length == 0
-    Spotify::Token.new_token { |error| puts error }
+    Spotify::Token.new_token do |res|
+        if res.is_a? Exception
+            puts res
+        elsif !res
+            puts "failed to parse first token"
+        else
+            puts Spotify::Token.access_token
+            Spotify::Token.refresh_token do |res|
+                if res.is_a? Exception
+                    puts res
+                elsif !res
+                    puts "failed to parse second token"
+                else
+                    puts Spotify::Token.access_token
+                end
+            end
+        end
+    end
 
     loop { Spotify::Token.cancel_new_token if gets == "!\n" }
 end
