@@ -370,7 +370,7 @@ module Spotify
         end
     end
 
-    #TODO rename exception and implement custom behaviour (like only get message if custom provided)
+    #TODO rename exception and implement custom behaviour ("message" only return message if custom provided in initialization of the error)
 
     class TokenParseError < SpotifyError
     end
