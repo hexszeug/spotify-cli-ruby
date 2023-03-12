@@ -7,8 +7,6 @@ require "base64"
 require "launchy"
 require "webrick"
 
-#TODO replace "&callback" arguments with "yield", "block_given?" and "&proc" syntax
-
 module Spotify
     module URLs
         AUTH_PROMPT = "https://accounts.spotify.com/authorize/"
@@ -17,23 +15,27 @@ module Spotify
     end
 
     module Token
-        include WEBrick
-
-        PROMPT_TIMEOUT_SEC = 5 * 60
-
         TOKEN_DIR = Dir.home + "/.spotify-cli-ruby"
         TOKEN_PATH = TOKEN_DIR + "/token.json"
 
-        SUCCESS_HTML_PATH = Dir.pwd + "/static/success.html"
-        ERROR_HTML_PATH = Dir.pwd + "/static/error.html"
-
-        HTTP_SERVER_CONFIG = Config::HTTP.update(Logger: BasicLog.new(nil, 0))
-
-        APP_ID = "4388096316894b88a147b53559d0c14a"
-        APP_SECRET = "77f2373853974699824602358ecdf9bd"
+        def Token.token?
+            @token ? true : false
+        end
 
         def Token.access_token
-            return @token ? @token[:access_token].dup : nil
+            @token ? @token[:access_token].dup : nil
+        end
+
+        def Token.refresh_token
+            @token ? @token[:refresh_token].dup : nil
+        end
+
+        def Token.expires_at
+            @token ? @token[:expires_at].dup : nil
+        end
+
+        def Token.expires_in
+            @token ? @token[:expires_at] - Time.now.to_i : nil
         end
 
         def Token.save_token
@@ -59,62 +61,7 @@ module Spotify
             return true
         end
 
-        def Token.new_token(&callback)
-            return false if @getting_token && Thread.current != @getting_token
-            if callback
-                @getting_token =
-                    Thread.new callback do |callback|
-                        begin
-                            callback.call new_token
-                        rescue OAuth2Error, TokenParseError => e
-                            callback.call e
-                        end
-                    end
-                @getting_token.name = "getting-token"
-                return true
-            end
-            @getting_token = true unless @getting_token
-            begin
-                set_token request_token_by_code get_code
-            ensure
-                @getting_token = false
-            end
-            return true
-        end
-
-        def Token.cancel_new_token
-            return false unless @getting_token.is_a?(Thread) && @getting_token.alive?
-            @getting_token.raise AuthManualCanceledError.new
-            return true
-        end
-
-        def Token.refresh_token(&callback)
-            return false unless @token
-            if callback
-                return(
-                    request_refresh_token(
-                        @token[:refresh_token],
-                        proc do |res|
-                            if res.is_a? Exception
-                                callback.call res
-                            else
-                                begin
-                                    set_token res
-                                rescue TokenParseError => e
-                                    callback.call e
-                                else
-                                    callback.call true
-                                end
-                            end
-                        end,
-                    )
-                )
-            end
-
-            return true
-        end
-
-        def self.set_token(token_hash)
+        def Token.set_token(token_hash)
             unless token_hash.is_a? Hash
                 raise TokenParseError.new "token must be a hash"
             end
@@ -140,6 +87,76 @@ module Spotify
                 @token = token
             end
             refresh_token {} if Time.now.to_i >= token[:expires_at]
+        end
+    end
+
+    module Auth
+        include WEBrick
+
+        PROMPT_TIMEOUT_SEC = 5 * 60
+
+        SUCCESS_HTML_PATH = Dir.pwd + "/static/success.html"
+        ERROR_HTML_PATH = Dir.pwd + "/static/error.html"
+
+        HTTP_SERVER_CONFIG = Config::HTTP.update(Logger: BasicLog.new(nil, 0))
+
+        APP_ID = "4388096316894b88a147b53559d0c14a"
+        APP_SECRET = "77f2373853974699824602358ecdf9bd"
+
+        def Auth.new_token!
+            return false if @getting_token && Thread.current != @getting_token
+            if block_given?
+                @getting_token =
+                    Thread.new do
+                        begin
+                            yield new_token!
+                        rescue OAuth2Error, TokenParseError => e
+                            yield e
+                        end
+                    end
+                @getting_token.name = "getting-token"
+                return(
+                    proc do
+                        unless @getting_token.is_a?(Thread) && @getting_token.alive?
+                            return false
+                        end
+                        @getting_token.raise AuthManualCanceledError.new
+                        return true
+                    end
+                )
+            end
+
+            @getting_token = true unless @getting_token
+            begin
+                Token.set_token request_token_by_code get_code
+            ensure
+                @getting_token = false
+            end
+            return true
+        end
+
+        def Auth.refresh_token!
+            return false unless Token.token?
+            if block_given?
+                cancel =
+                    request_token_api(
+                        { grant_type: "refresh_token", refresh_token: Token.refresh_token },
+                    ) do |res|
+                        if res.is_a? Exception
+                            yield res
+                        else
+                            begin
+                                Token.set_token res
+                            rescue TokenParseError => e
+                                yield e
+                            else
+                                yield true
+                            end
+                        end
+                    end
+                return cancel
+            end
+
             return true
         end
 
@@ -309,16 +326,7 @@ module Spotify
             )
         end
 
-        def self.request_refresh_token(refresh_token, callback = nil)
-            return(
-                request_token_api(
-                    { grant_type: "refresh_token", refresh_token: refresh_token },
-                    callback,
-                )
-            )
-        end
-
-        def self.request_token_api(body, callback = nil)
+        def self.request_token_api(body)
             uri = URI(Spotify::URLs::AUTH_TOKEN)
             header = {
                 Authorization:
@@ -326,10 +334,14 @@ module Spotify
                 "Content-Type": Spotify::MIME::POST_FORM,
             }
             req_body = URI.encode_www_form body
-            if callback
+            if block_given?
                 cancel =
                     Spotify::Request.http_request(uri, :post, header, req_body) do |res|
-                        parse_token_response res
+                        begin
+                            yield parse_token_response res
+                        rescue OAuth2Error => e
+                            yield e
+                        end
                     end
                 return cancel
             end
@@ -351,7 +363,7 @@ module Spotify
                 raise AuthTokenRequestError.new res.message
             end
             begin
-                body = JSON.parse res.body
+                body = JSON.parse res.body, symbolize_names: true
             rescue JSON::JSONError
                 raise AuthTokenRequestError.new "malformed response body"
             end
@@ -447,14 +459,14 @@ end
 #TODO remove testing script
 
 if caller.length == 0
-    Spotify::Token.new_token do |res|
+    Spotify::Auth.new_token! do |res|
         if res.is_a? Exception
-            puts res
+            puts "#{res.class}: #{res.message}"
         elsif !res
             puts "failed to parse first token"
         else
             puts Spotify::Token.access_token
-            Spotify::Token.refresh_token do |res|
+            Spotify::Auth.refresh_token! do |res|
                 if res.is_a? Exception
                     puts res
                 elsif !res
@@ -466,5 +478,5 @@ if caller.length == 0
         end
     end
 
-    loop { Spotify::Token.cancel_new_token if gets == "!\n" }
+    loop { Spotify::Auth.cancel_new_token if gets == "!\n" }
 end
