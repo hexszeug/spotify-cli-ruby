@@ -1,3 +1,9 @@
 {
-  "recommendations": ["KoichiSasada.vscode-rdbg"]
+  "recommendations": [
+    "koichisasada.vscode-rdbg",
+    "kaiwood.endwise",
+    "wingrunr21.vscode-ruby",
+    "esbenp.prettier-vscode",
+    "castwide.solargraph"
+  ]
 }
