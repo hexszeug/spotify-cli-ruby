@@ -1,4 +1,4 @@
-require_relative "spotify"
+require_relative "../spotify"
 
 require "net/http"
 
@@ -89,32 +89,32 @@ module Spotify
         end
     end
 
-    class RequestError < SpotifyError
-        def initialize(uri, method, header, body, msg = nil)
-            super msg if msg
-            @uri = uri
-            @method = method
-            @header = header
-            @body = body
-        end
+    # class RequestError < SpotifyError
+    #     def initialize(uri, method, header, body, msg = nil)
+    #         super msg if msg
+    #         @uri = uri
+    #         @method = method
+    #         @header = header
+    #         @body = body
+    #     end
 
-        attr_reader :uri
-        attr_reader :method
-        attr_reader :header
-        attr_reader :body
-    end
+    #     attr_reader :uri
+    #     attr_reader :method
+    #     attr_reader :header
+    #     attr_reader :body
+    # end
 
-    class TimeoutError < RequestError
-    end
+    # class TimeoutError < RequestError
+    # end
 
-    class CancelError < RequestError
-    end
+    # class CancelError < RequestError
+    # end
 
-    class ConnectionError < RequestError
-    end
+    # class ConnectionError < RequestError
+    # end
 
-    class ParsingError < RequestError
-    end
+    # class ParsingError < RequestError
+    # end
 end
 
 #TODO remove testing script
