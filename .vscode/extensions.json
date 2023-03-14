@@ -3,7 +3,8 @@
     "koichisasada.vscode-rdbg",
     "kaiwood.endwise",
     "wingrunr21.vscode-ruby",
-    "esbenp.prettier-vscode",
-    "castwide.solargraph"
+    "castwide.solargraph",
+    "misogi.ruby-rubocop",
+    "esbenp.prettier-vscode"
   ]
 }
