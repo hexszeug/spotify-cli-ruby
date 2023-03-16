@@ -3,8 +3,6 @@
 require 'test/unit'
 require './lib/spotify'
 
-require 'launchy'
-
 class PromptTest < Test::Unit::TestCase
   class << self
     attr_accessor :arg, :raises

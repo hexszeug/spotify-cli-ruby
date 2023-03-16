@@ -6,7 +6,7 @@ module Spotify
   module Auth
     module CodeServer
       # raised by CodeServer.start when the system call to open the socket fails
-      class OpenServerError < Auth::LoginError
+      class OpenServerError < SpotifyError
         attr_reader :system_call_error
 
         def initialize(system_call_error)
@@ -17,7 +17,7 @@ module Spotify
 
       # raised when authorize endpoint denies request for authorization code
       # for possible error_str see https://www.rfc-editor.org/rfc/rfc6749#section-4.1.2.1
-      class CodeDeniedError < Auth::LoginError
+      class CodeDeniedError < SpotifyError
         attr_reader :error_str
 
         def initialize(error_str)
@@ -33,58 +33,56 @@ module Spotify
         HOST = URI(Spotify::Auth::REDIRECT_URL)
 
         # returns:
-        # - Proc (to cancel async execution)
-        #
-        # yields:
-        # - String (code)
+        # - Promise
         #
         # raises:
         # - OpenCodeServerError
         #
-        # yield-raises:
-        # - CodeDeniedError
-        # - every error raised in &block
+        # resolves:
+        # - String (code)
         #
-        # TODO: return promise which may register a error handler
-        def start(state, &block)
+        # resolves to errors:
+        # - CodeDeniedError
+        # - every error raised in Promise.resolve
+        def start(state, &)
           return unless block_given?
 
           @state = state
-          @callback = block
+          @promise = Spotify::Promise.new(&).on_cancel { stop }
           return if @server
 
           begin
             @server = TCPServer.new(HOST.hostname, HOST.port)
           rescue SystemCallError => e
+            stop
             raise OpenServerError, e
           end
-          Thread.new { server_loop }
-          proc { stop }
+          Thread.new do
+            Thread.current.name = 'code-server/loop'
+            server_loop
+          end
+          @promise
         end
 
         def stop
-          return unless @server
-
-          @server.close
+          @server&.close
+          @server = nil
           @state = nil
-          @callback = nil
+          @promise = nil
         end
 
         private
 
         def server_loop
-          Thread.current.name = 'code-server/loop'
-          begin
-            while @server && !@server.closed?
-              Thread.new(@server.accept) do |socket|
-                handle_connection socket
-                socket.close
-              end
+          while @server && !@server.closed?
+            Thread.new(@server.accept) do |socket|
+              handle_connection socket
+              socket.close
             end
-          rescue IOError
-            @server&.close
-            @server = nil
           end
+        rescue IOError
+          @server&.close
+          @server = nil
         end
 
         def handle_connection(socket)
@@ -130,30 +128,30 @@ module Spotify
         end
 
         def on_code_denied(res, error_str)
-          callback = @callback
-          CodeServer.stop
-          report_error(res, callback, CodeDeniedError.new(error_str))
+          promise = @promise
+          stop
+          report_error(res, promise, CodeDeniedError.new(error_str))
         end
 
         def on_code_received(res, code)
-          callback = @callback
-          CodeServer.stop
+          promise = @promise
+          stop
           old_thread_name = Thread.current.name
           Thread.current.name = 'code-server/return'
           begin
-            callback.call code
+            promise.resolve code
           rescue StandardError => e
             Thread.current.name = old_thread_name
-            report_error(res, callback, e)
+            report_error(res, promise, e)
           else
             generate_response res
           end
         end
 
-        def report_error(res, callback, error)
+        def report_error(res, promise, error)
           Thread.new do
             Thread.current.name = 'code-server/return/error'
-            callback.call error
+            promise.resolve_error error
           end
           generate_response res, error
         end

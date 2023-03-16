@@ -37,7 +37,9 @@ module Spotify
           @getting_token.name = 'getting-token'
           return(
               proc do
-                return false unless @getting_token.is_a?(Thread) && @getting_token.alive?
+                unless @getting_token.is_a?(Thread) && @getting_token.alive?
+                  return false
+                end
 
                 @getting_token.raise AuthManualCanceledError.new
                 return true
@@ -69,7 +71,7 @@ module Spotify
                 yield res
               else
                 begin
-                  Token.set_token res
+                  Token.token = res
                 rescue TokenError => e
                   yield e
                 else
@@ -274,11 +276,17 @@ module Spotify
           req = HTTPRequest.new HTTP_SERVER_CONFIG
           res = HTTPResponse.new HTTP_SERVER_CONFIG
           req.parse socket
-          raise HTTPStatus::NoContent if req.path != URI(Spotify::URLs::AUTH_REDIRECT).path
+          if req.path != URI(Spotify::URLs::AUTH_REDIRECT).path
+            raise HTTPStatus::NoContent
+          end
 
           query = req.query
           raise WrongOrMissingState, 'missing state' unless query.key?('state')
-          raise WrongOrMissingState, "wrong state `#{query['state']}'" unless query['state'] == state
+
+          unless query['state'] == state
+            raise WrongOrMissingState,
+                  "wrong state `#{query['state']}'"
+          end
 
           if query.key?('error')
             raise UserDeniedAccessError if query['error'] == 'access_denied'
@@ -327,13 +335,17 @@ module Spotify
       end
 
       def self.generate_success_page
-        return 'Done! You may close this tab now.' unless File.exist? SUCCESS_HTML_PATH
+        unless File.exist? SUCCESS_HTML_PATH
+          return 'Done! You may close this tab now.'
+        end
 
         File.read SUCCESS_HTML_PATH
       end
 
       def self.generate_error_page(error)
-        return "#{error.status} #{error.reason_phrase}" unless File.exist? ERROR_HTML_PATH
+        unless File.exist? ERROR_HTML_PATH
+          return "#{error.status} #{error.reason_phrase}"
+        end
 
         page = File.read ERROR_HTML_PATH
         page.gsub! '$error_code', error.code.to_s
@@ -364,7 +376,7 @@ module Spotify
         req_body = URI.encode_www_form body
         if block_given?
           cancel =
-            Spotify::Request.http_request(uri, :post, header, req_body) do |res|
+            Spotify::Request.http(uri, :post, header, req_body) do |res|
               yield parse_token_response res
             rescue OAuth2Error => e
               yield e
@@ -372,7 +384,7 @@ module Spotify
           return cancel
         end
         begin
-          res = Spotify::Request.http_request uri, :post, header, req_body
+          res = Spotify::Request.http uri, :post, header, req_body
         rescue RequestError => e
           res = e
         end

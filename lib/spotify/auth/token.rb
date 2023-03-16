@@ -3,84 +3,161 @@
 module Spotify
   module Auth
     module Token
-      TOKEN_DIR = "#{Dir.home}/.spotify-cli-ruby"
-      TOKEN_PATH = "#{TOKEN_DIR}/token.json"
+      TOKEN_PATH = "#{Spotify::CONFIG_DIR}/token.json".freeze
+
+      class NoTokenError < SpotifyError
+      end
+
+      # superclass for token parse errors
+      class TokenParseError < SpotifyError
+      end
+
+      class MalformedTokenError < TokenParseError
+      end
+
+      class MissingAccessTokenError < TokenParseError
+      end
+
+      class MissingExpirationTimeError < TokenParseError
+      end
+
+      class MissingRefreshTokenError < TokenParseError
+      end
 
       class << self
-        def token?
-          @token ? true : false
+        def get
+          @token
         end
 
         def access_token
-          @token ? @token[:access_token].dup : nil
+          raise NoTokenError unless @token
+
+          @token[:access_token]
         end
 
         def refresh_token
-          @token ? @token[:refresh_token].dup : nil
+          raise NoTokenError unless @token
+
+          @token[:refresh_token]
         end
 
-        def expires_at
-          @token ? @token[:expires_at].dup : nil
-        end
+        # returns:
+        # - token
+        #
+        # raises:
+        # - NoTokenError
+        def save
+          raise NoTokenError unless @token
 
-        def expires_in
-          @token ? @token[:expires_at] - Time.now.to_i : nil
-        end
-
-        def save_token
-          return false unless @token
-
-          begin
-            token_json = JSON.pretty_generate @token
-          rescue JSON::JSONError
-            return false
-          end
-          Dir.mkdir TOKEN_DIR unless Dir.exist? TOKEN_DIR
+          token_json = JSON.pretty_generate(@token)
+          FileUtils.mkpath(File.dirname(TOKEN_PATH))
           File.write TOKEN_PATH, "#{token_json}\n"
-          true
+          @token
         end
 
-        def load_token
-          return false unless File.file? TOKEN_PATH
+        # returns:
+        # - token
+        #
+        # raises:
+        # - NoTokenError
+        # - MalformedTokenError
+        # - MissingAccessTokenError
+        # - MissingExpirationTimeError
+        # - MissingRefreshTokenError
+        def load
+          raise NoTokenError unless File.file? TOKEN_PATH
 
-          begin
-            token_hash = JSON.parse File.read(TOKEN_PATH), symbolize_names: true
-            set_token token_hash
-          rescue JSON::JSONError, TokenError
-            return false
-          end
-          true
+          set(JSON.parse(File.read(TOKEN_PATH), symbolize_names: true))
+          refresh if @token[:expires_at] <= Time.now.to_i
+        rescue JSON::JSONError
+          raise MalformedTokenError
         end
 
-        def set_token(token_hash)
-          raise TokenError, 'token must be a hash' unless token_hash.is_a? Hash
+        # returns:
+        # - token
+        # - Promise (when called with block)
+        #
+        # resolves:
+        # - token
+        #
+        # raises / resolves to error:
+        # - NoTokenError (always raised. even when called with block)
+        # - MalformedTokenError
+        # - MissingAccessTokenError
+        # - MissingExpirationTimeError
+        # - MissingRefreshTokenError
+        # - Auth::TokenFetcher::ParseError
+        # - Auth::TokenFetcher::TokenDeniedError
+        # - Request::RequestError
+        #
+        # TODO: delete token when TokenDenied tells to do so
+        def refresh(&)
+          raise NoTokenError unless @token
 
-          token = token_hash.dup
-          token.delete_if do |key|
-            !%i[access_token refresh_token expires_in expires_at].include? key
-          end
-          unless token.key?(:access_token) && token[:access_token].is_a?(String)
-            raise TokenError, 'missing access token'
+          return set(Auth::TokenFetcher.fetch) unless block_given?
+
+          promise = Spotify::Promise.new(&)
+          fetch_promise =
+            Auth::TokenFetcher.fetch do |token|
+              set(token)
+            rescue TokenParseError => e
+              promise.resolve_error(e)
+            else
+              promise.resolve @token
+            end.error do |error|
+              promise.resolve_error(error)
+            end
+          promise.on_cancel { fetch_promise.cancel }
+        end
+
+        # returns:
+        # - token
+        #
+        # raises:
+        # - MalformedTokenError
+        # - MissingAccessTokenError
+        # - MissingExpirationTimeError
+        # - MissingRefreshTokenError
+        def set(token)
+          raise MalformedTokenError unless token.instance_of?(Hash)
+          raise MissingAccessTokenError unless token[:access_token]
+          raise MissingRefreshTokenError unless token[:refresh_token] || @token
+          unless token[:expires_at] || token[:expires_in]
+            raise MissingExpirationTimeError
           end
 
-          if token.key?(:expires_in) && !token.key?(:expires_at) &&
-             token[:expires_in].is_a?(Integer)
-            token[:expires_at] = Time.now.to_i + token[:expires_in]
-          end
-          token.delete :expires_in
-          unless token.key?(:expires_at) && token[:expires_at].is_a?(Integer)
-            raise TokenError, 'missing expiration infomation'
-          end
+          token[:refresh_token] ||= @token[:refresh_token]
+          @token = token
+          flatten
+          normalize_expiration_time
+          deep_freeze
+        end
 
-          if token.key?(:refresh_token) &&
-             token[:refresh_token].is_a?(String)
-            @token = token
-          else
-            raise TokenError, 'missing refresh token' unless @token
+        private
 
-            @token.update token
+        ALLOWED_PAIRS = {
+          access_token: String,
+          refresh_token: String,
+          expires_in: Integer,
+          expires_at: Integer
+        }.freeze
+
+        def flatten
+          @token.delete_if do |key, value|
+            !ALLOWED_PAIRS.key?(key) || !value.instance_of?(ALLOWED_PAIRS[key])
           end
-          refresh_token {} if Time.now.to_i >= token[:expires_at]
+        end
+
+        def normalize_expiration_time
+          return unless @token[:expires_in]
+
+          @token[:expires_at] ||= Time.now.to_i + @token[:expires_in]
+          @token.delete(:expires_in)
+        end
+
+        def deep_freeze
+          @token.each_value(&:freeze)
+          @token.freeze
         end
       end
     end

@@ -5,7 +5,7 @@ require 'launchy'
 module Spotify
   module Auth
     module Prompt
-      class OpenPromptError < Auth::LoginError
+      class OpenPromptError < SpotifyError
       end
 
       class << self

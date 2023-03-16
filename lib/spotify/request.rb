@@ -4,31 +4,80 @@ require 'net/http'
 
 module Spotify
   module Request
-    # TODO: refactor
     # TODO: properly cache results
     # TODO: use persistent tcp connection
+
+    # superclass for request errors
+    class RequestError < SpotifyError
+      attr_reader :uri, :method, :header, :body
+
+      def initialize(uri, method, header, body, msg = nil)
+        super(msg) if msg
+        @uri = uri
+        @method = method
+        @header = header
+        @body = body
+      end
+    end
+
+    class TimeoutError < RequestError
+    end
+
+    class CancelError < RequestError
+    end
+
+    class ConnectionError < RequestError
+    end
+
+    class ParsingError < RequestError
+    end
+
     class << self
       DEFAULT_TIMEOUT = 10
 
-      def http_request(
+      # returns:
+      # - Net::HTTPResponse
+      # - Promise (when called with block)
+      #
+      # resolves:
+      # - Net::HTTPResponse
+      #
+      # raises / resolves to errors:
+      # - TimeoutError
+      # - ConnectionError
+      # - ParsingError
+      #
+      # resolves to errors:
+      # - CancelError
+      def http(
         uri,
         method,
         header = {},
         body = nil,
-        timeout: DEFAULT_TIMEOUT
+        timeout: DEFAULT_TIMEOUT,
+        &
       )
+        uri = URI(uri) if uri.is_a?(String)
+        unless uri.is_a?(URI::HTTP)
+          raise ArgumentError,
+                "#{uri} is not an http uri"
+        end
+
         name = "request/#{method.to_s.upcase} request to #{uri}"
         if block_given?
+          promise = Spotify::Promise.new(&)
           thread =
             Thread.new do
               Thread.current.name = name
-              res = http_request(uri, method, header, body, timeout:)
+              res = http(uri, method, header, body, timeout:)
             rescue RequestError => e
-              yield e
+              promise.resolve_error(e)
             else
-              yield res
+              promise.resolve(res)
             end
-          return proc { thread.raise CancelError.new uri, method, header, body }
+          return promise.on_cancel do
+                   thread.raise CancelError.new uri, method, header, body
+                 end
         end
         begin
           timeout_thread =
@@ -43,6 +92,8 @@ module Spotify
         end
         res
       end
+
+      private
 
       def sync_http_request(uri, method, header, body)
         req_class =
@@ -67,7 +118,7 @@ module Spotify
             Net::HTTP.start(
               uri.hostname,
               uri.port,
-              use_ssl: uri.scheme == 'https'
+              use_ssl: uri.instance_of?(URI::HTTPS)
             ) { |http_connection| http_connection.request req, body }
           res.read_body
         rescue SystemCallError, IOError, OpenSSL::SSL::SSLError => e
@@ -78,31 +129,6 @@ module Spotify
           raise TimeoutError.new uri, method, header, body, e.message
         end
         res
-      end
-
-      # superclass for request errors
-      class RequestError < SpotifyError
-        attr_reader :uri, :method, :header, :body
-
-        def initialize(uri, method, header, body, msg = nil)
-          super(msg) if msg
-          @uri = uri
-          @method = method
-          @header = header
-          @body = body
-        end
-      end
-
-      class TimeoutError < RequestError
-      end
-
-      class CancelError < RequestError
-      end
-
-      class ConnectionError < RequestError
-      end
-
-      class ParsingError < RequestError
       end
     end
   end

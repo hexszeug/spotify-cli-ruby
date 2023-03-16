@@ -42,14 +42,18 @@ module Spotify
           grant_type: 'refresh_token'
         }.freeze
 
-        # returns / yields:
-        # - token
+        # returns:
+        # - Token
+        # - Promise (when called with block)
         #
-        # raises / yield-raises:
+        # resolves:
+        # - Token
+        #
+        # raises / resolves to error:
         # - ParseError
-        # - TokenFetchError
+        # - TokenDeniedError
         # - Request::RequestError
-        def fetch(code: nil)
+        def fetch(code: nil, &)
           body = URI.encode_www_form(
             if code.nil?
               REFRESH_BODY.merge(refresh_token: Auth::Token.refresh_token)
@@ -57,27 +61,30 @@ module Spotify
               CODE_BODY.merge(code:)
             end
           )
-          if block_given?
-            Spotify::Request.http_request(
-              ENDPOINT_URI, :post, HEADER, body
-            ) do |res|
-              if res.is_a? Spotify::Request::RequestError
-                yield res
-              else
-                begin
-                  token = receive(res)
-                rescue TokenFetchError => e
-                  yield e
-                else
-                  yield token
-                end
-              end
-            end
-          else
-            receive(
-              Spotify::Request.http_request(ENDPOINT_URI, :post, HEADER, body)
+
+          unless block_given?
+            return receive(
+              Spotify::Request.http(ENDPOINT_URI, :post, HEADER, body)
             )
           end
+
+          promise = Spotify::Promise.new(&)
+          request_promise =
+            Spotify::Request.http(
+              ENDPOINT_URI,
+              :post,
+              HEADER,
+              body
+            ) do |res|
+              token = receive(res)
+            rescue TokenFetchError => e
+              promise.resolve_error(e)
+            else
+              promise.resolve(token)
+            end.error do |error|
+              promise.resolve_error(error)
+            end
+          promise.on_cancel { request_promise.cancel }
         end
 
         private

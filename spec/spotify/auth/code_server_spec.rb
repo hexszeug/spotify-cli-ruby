@@ -81,34 +81,45 @@ class CodeServerTest < Test::Unit::TestCase
 
   def test_code_denied
     calls = 0
-    Spotify::Auth::CodeServer.start('my_state') do |code|
+    errors = 0
+    Spotify::Auth::CodeServer.start('my_state') do
       calls += 1
-      assert_instance_of Spotify::Auth::CodeServer::CodeDeniedError, code
-      assert_equal code.error_str, 'my_error'
+    end.error do |error|
+      errors += 1
+      assert_instance_of Spotify::Auth::CodeServer::CodeDeniedError, error
+      assert_equal error.error_str, 'my_error'
     end
     assert_equal 0, calls
+    assert_equal 0, errors
     assert_match(
       /400 Bad Request/,
       request("GET /callback/?state=my_state&error=my_error HTTP/1.0\r\n\r\n")
     )
-    assert_equal 1, calls
+    sleep 0.1
+    assert_equal 0, calls
+    assert_equal 1, errors
     assert_nil Spotify::Auth::CodeServer.server
   end
 
   def test_internal_server_error
     calls = 0
-    Spotify::Auth::CodeServer.start('my_state') do |code|
+    errors = 0
+    Spotify::Auth::CodeServer.start('my_state') do |_code|
       calls += 1
-      raise 'my_error' unless code.is_a? StandardError
-
-      assert_equal('my_error', code.message)
+      raise 'my_error'
+    end.error do |error|
+      errors += 1
+      assert_equal('my_error', error.message)
     end
     assert_equal 0, calls
+    assert_equal 0, errors
     assert_match(
       /500 Internal Server Error/,
       request("GET /callback/?state=my_state&code=my_code HTTP/1.0\r\n\r\n")
     )
-    assert_equal 2, calls
+    sleep 0.1
+    assert_equal 1, calls
+    assert_equal 1, errors
     assert_nil Spotify::Auth::CodeServer.server
   end
 end

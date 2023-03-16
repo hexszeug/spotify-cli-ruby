@@ -11,43 +11,58 @@ module Spotify
     REDIRECT_URL = 'http://localhost:8888/callback/'
     TOKEN_URL = 'https://accounts.spotify.com/api/token/'
 
-    class LoginError < Spotify::SpotifyError
-    end
-
     class << self
       LOGIN_TIMEOUT_SEC = 5 * 60
 
-      def login
-        return unless block_given?
+      ##
+      # @param & [Proc] optional callback of returned [Spotify::Promise]
+      # @return [Spotify::Promise]
+      #
+      # @raise [Prompt::OpenPromptError]
+      # @raise [CodeServer::OpenServerError]
+      # @raise [CodeServer::CodeDeniedError]
+      # @raise [TokenFetcher::TokenFetchError] and subclasses
+      # @raise [TokenFetcher::ParseError]
+      # @raise [TokenFetcher::TokenDeniedError]
+      # @raise [Token::TokenParseError] and subclasses
+      # @raise [Token::MalformedTokenError]
+      # @raise [Token::MissingAccessTokenError]
+      # @raise [Token::MissingExpirationTimeError]
+      # @raise [Token::MissingRefreshTokenError]
+      def login(&)
+        promise = Spotify::Promise.new(&)
 
         timeout_thread = Thread.new do
           Thread.current.name = 'login/timeout'
           sleep LOGIN_TIMEOUT_SEC
           CodeServer.stop
         end
+
         state = SecureRandom.hex 16
-        CodeServer.start(state) do |code_or_error|
-          if code_or_error.instance_of? StandardError
-            timeout_thread.kill
-            yield code_or_error
-          else
-            token = TokenFetcher.fetch(code: code_or_error)
-            Token.set_token(token)
-            timeout_thread.kill
-            Thread.new { 
-              Thread.current.name = 'login/return'
-              yield
-            }
+        CodeServer.start(state) do |code|
+          token = TokenFetcher.fetch(code:)
+          Token.set(token)
+          timeout_thread.kill
+          Thread.new do
+            Thread.current.name = 'login/return'
+            promise.resolve
           end
+        end.error do |error|
+          timeout_thread.kill
+          promise.resolve_error(error)
         end
         Prompt.open(state)
+        promise.on_cancel do
+          timeout_thread.kill
+          CodeServer.stop
+        end
       rescue CodeServer::OpenServerError => e
         timeout_thread.kill
-        yield e
+        promise.resolve_error(e)
       rescue Prompt::OpenPromptError => e
         CodeServer.stop
         timeout_thread.kill
-        yield e
+        promise.resolve_error(e)
       end
     end
   end

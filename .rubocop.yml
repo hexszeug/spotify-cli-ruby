@@ -13,3 +13,9 @@ Metrics/ModuleLength:
 
 Metrics/AbcSize:
   Max: 30
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Style/MultilineBlockChain:
+  Enabled: false
