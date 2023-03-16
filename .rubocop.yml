@@ -1,0 +1,15 @@
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.2.1
+
+Layout/LineLength:
+  Max: 80
+
+Metrics/MethodLength:
+  Max: 35
+
+Metrics/ModuleLength:
+  Max: 200
+
+Metrics/AbcSize:
+  Max: 30
