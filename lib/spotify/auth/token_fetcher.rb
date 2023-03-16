@@ -6,14 +6,17 @@ require 'base64'
 module Spotify
   module Auth
     module TokenFetcher
+      ##
       # superclass for token fetch errors
       class TokenFetchError < SpotifyError
       end
 
+      ##
       # raised when token endpoint return not parsable body
       class ParseError < TokenFetchError
       end
 
+      ##
       # raised when token endpoint denies to request new / refresh token
       # for possible error_str see https://www.rfc-editor.org/rfc/rfc6749#section-5.2
       class TokenDeniedError < TokenFetchError
@@ -42,17 +45,21 @@ module Spotify
           grant_type: 'refresh_token'
         }.freeze
 
-        # returns:
-        # - Token
-        # - Promise (when called with block)
+        ##
+        # fetches new access token
+        # using code when given
+        # or refresh token otherwise
         #
-        # resolves:
-        # - Token
+        # @param code [String] *(optional)*
         #
-        # raises / resolves to error:
-        # - ParseError
-        # - TokenDeniedError
-        # - Request::RequestError
+        # @return [Hash] token
+        # @return [Promise] *(when called with block)*
+        #
+        # @raise [Auth::Token::NoTokenError]
+        # @raise [Request::RequestError]
+        # @raise [TokenFetchError] superclass
+        # @raise [ParseError]
+        # @raise [TokenDeniedError]
         def fetch(code: nil, &)
           body = URI.encode_www_form(
             if code.nil?
@@ -78,11 +85,11 @@ module Spotify
             ) do |res|
               token = receive(res)
             rescue TokenFetchError => e
-              promise.resolve_error(e)
+              promise.fail(e)
             else
               promise.resolve(token)
             end.error do |error|
-              promise.resolve_error(error)
+              promise.fail(error)
             end
           promise.on_cancel { request_promise.cancel }
         end

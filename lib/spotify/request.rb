@@ -4,9 +4,10 @@ require 'net/http'
 
 module Spotify
   module Request
-    # TODO: properly cache results
-    # TODO: use persistent tcp connection
+    # @todo properly cache results
+    # @todo use persistent tcp connection
 
+    ##
     # superclass for request errors
     class RequestError < SpotifyError
       attr_reader :uri, :method, :header, :body
@@ -35,20 +36,14 @@ module Spotify
     class << self
       DEFAULT_TIMEOUT = 10
 
-      # returns:
-      # - Net::HTTPResponse
-      # - Promise (when called with block)
+      ##
+      # @return [Net::HTTPResponse]
+      # @return [Promise] *(when called with block)*
       #
-      # resolves:
-      # - Net::HTTPResponse
-      #
-      # raises / resolves to errors:
-      # - TimeoutError
-      # - ConnectionError
-      # - ParsingError
-      #
-      # resolves to errors:
-      # - CancelError
+      # @raise [TimeoutError]
+      # @raise [ConnectionError]
+      # @raise [ParsingError]
+      # @raise [CancelError]
       def http(
         uri,
         method,
@@ -71,7 +66,7 @@ module Spotify
               Thread.current.name = name
               res = http(uri, method, header, body, timeout:)
             rescue RequestError => e
-              promise.resolve_error(e)
+              promise.fail(e)
             else
               promise.resolve(res)
             end

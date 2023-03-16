@@ -8,6 +8,7 @@ module Spotify
       class NoTokenError < SpotifyError
       end
 
+      ##
       # superclass for token parse errors
       class TokenParseError < SpotifyError
       end
@@ -41,11 +42,12 @@ module Spotify
           @token[:refresh_token]
         end
 
-        # returns:
-        # - token
+        ##
+        # saves token to config file
         #
-        # raises:
-        # - NoTokenError
+        # @return [Hash] token
+        #
+        # @raise [NoTokenError]
         def save
           raise NoTokenError unless @token
 
@@ -55,15 +57,16 @@ module Spotify
           @token
         end
 
-        # returns:
-        # - token
+        ##
+        # loads token from config file
         #
-        # raises:
-        # - NoTokenError
-        # - MalformedTokenError
-        # - MissingAccessTokenError
-        # - MissingExpirationTimeError
-        # - MissingRefreshTokenError
+        # @return [Hash] token
+        #
+        # @raise [NoTokenError]
+        # @raise [MalformedTokenError]
+        # @raise [MissingAccessTokenError]
+        # @raise [MissingExpirationTimeError]
+        # @raise [MissingRefreshTokenError]
         def load
           raise NoTokenError unless File.file? TOKEN_PATH
 
@@ -73,51 +76,60 @@ module Spotify
           raise MalformedTokenError
         end
 
-        # returns:
-        # - token
-        # - Promise (when called with block)
+        ##
+        # refreshs token (no checks for expiration)
         #
-        # resolves:
-        # - token
+        # @return [Hash] token
+        # @return [Promise] *(when called with block)*
         #
-        # raises / resolves to error:
-        # - NoTokenError (always raised. even when called with block)
-        # - MalformedTokenError
-        # - MissingAccessTokenError
-        # - MissingExpirationTimeError
-        # - MissingRefreshTokenError
-        # - Auth::TokenFetcher::ParseError
-        # - Auth::TokenFetcher::TokenDeniedError
-        # - Request::RequestError
+        # @raise [NoTokenError]
+        # @raise [MalformedTokenError]
+        # @raise [MissingAccessTokenError]
+        # @raise [MissingExpirationTimeError]
+        # @raise [MissingRefreshTokenError]
+        # @raise [Auth::TokenFetcher::ParseError]
+        # @raise [Auth::TokenFetcher::TokenDeniedError]
+        # @raise [Request::RequestError]
         #
-        # TODO: delete token when TokenDenied tells to do so
+        # @todo delete token when TokenDenied tells to do so
         def refresh(&)
-          raise NoTokenError unless @token
+          unless block_given?
+            begin
+              raise NoTokenError unless @token
 
-          return set(Auth::TokenFetcher.fetch) unless block_given?
+              return set(Auth::TokenFetcher.fetch)
+            rescue Auth::TokenFetcher::TokenDeniedError => e
+              delete_if_revoked(e)
+              raise e
+            end
+          end
 
           promise = Spotify::Promise.new(&)
+          return promise.fail(NoTokenError.new) unless @token
+
           fetch_promise =
             Auth::TokenFetcher.fetch do |token|
               set(token)
             rescue TokenParseError => e
-              promise.resolve_error(e)
+              promise.fail(e)
             else
               promise.resolve @token
             end.error do |error|
-              promise.resolve_error(error)
+              delete_if_revoked(error)
+              promise.fail(error)
             end
           promise.on_cancel { fetch_promise.cancel }
         end
 
-        # returns:
-        # - token
+        ##
+        # @param token [Hash]
         #
-        # raises:
-        # - MalformedTokenError
-        # - MissingAccessTokenError
-        # - MissingExpirationTimeError
-        # - MissingRefreshTokenError
+        # @return [Hash] token
+        #
+        # @raise [MalformedTokenError]
+        # @raise [MissingAccessTokenError]
+        # @raise [MissingExpirationTimeError]
+        # @raise [MissingRefreshTokenError]
         def set(token)
           raise MalformedTokenError unless token.instance_of?(Hash)
           raise MissingAccessTokenError unless token[:access_token]
@@ -134,6 +146,13 @@ module Spotify
         end
 
         private
+
+        def delete_if_revoked(error)
+          return unless error.instance_of?(Auth::TokenFetcher::TokenDeniedError)
+          return unless error.error_str == 'invalid_grant'
+
+          @token = nil
+        end
 
         ALLOWED_PAIRS = {
           access_token: String,

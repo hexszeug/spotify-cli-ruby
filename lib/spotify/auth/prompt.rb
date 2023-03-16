@@ -35,8 +35,13 @@ module Spotify
           ].join(' ')
         }.freeze
 
-        # raises:
-        # - OpenPromptError when failed to open prompt
+        ##
+        # @param state [String] state which is passed back with
+        #   code and should be checked
+        #
+        # @return [nil]
+        #
+        # @raise [OpenPromptError]
         def open(state)
           uri = URI(Auth::PROMPT_URL)
           uri.query = URI.encode_www_form(PROMPT_QUERY.merge(state:))

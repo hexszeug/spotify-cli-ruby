@@ -6,7 +6,7 @@ th = Thread.current
 
 promise =
   Spotify::Auth.login do
-    puts "successfully received token: #{Spotify::Auth::Token.access_token}"
+    puts "successfully received token: #{Spotify::Auth::Token.get}"
     th.kill
   end.error do |error|
     th.raise error

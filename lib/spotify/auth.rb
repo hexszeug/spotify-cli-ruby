@@ -15,16 +15,18 @@ module Spotify
       LOGIN_TIMEOUT_SEC = 5 * 60
 
       ##
-      # @param & [Proc] optional callback of returned [Spotify::Promise]
-      # @return [Spotify::Promise]
+      # @param & [Proc] *(optional)* set as callback for promise
+      #
+      # @return [Promise]
+      # @return [nil]2
       #
       # @raise [Prompt::OpenPromptError]
       # @raise [CodeServer::OpenServerError]
       # @raise [CodeServer::CodeDeniedError]
-      # @raise [TokenFetcher::TokenFetchError] and subclasses
+      # @raise [TokenFetcher::TokenFetchError] superclass
       # @raise [TokenFetcher::ParseError]
       # @raise [TokenFetcher::TokenDeniedError]
-      # @raise [Token::TokenParseError] and subclasses
+      # @raise [Token::TokenParseError] superclass
       # @raise [Token::MalformedTokenError]
       # @raise [Token::MissingAccessTokenError]
       # @raise [Token::MissingExpirationTimeError]
@@ -38,7 +40,7 @@ module Spotify
           CodeServer.stop
         end
 
-        state = SecureRandom.hex 16
+        state = SecureRandom.alphanumeric
         CodeServer.start(state) do |code|
           token = TokenFetcher.fetch(code:)
           Token.set(token)
@@ -49,20 +51,18 @@ module Spotify
           end
         end.error do |error|
           timeout_thread.kill
-          promise.resolve_error(error)
+          promise.fail(error)
         end
         Prompt.open(state)
         promise.on_cancel do
           timeout_thread.kill
           CodeServer.stop
         end
-      rescue CodeServer::OpenServerError => e
-        timeout_thread.kill
-        promise.resolve_error(e)
       rescue Prompt::OpenPromptError => e
         CodeServer.stop
         timeout_thread.kill
-        promise.resolve_error(e)
+        promise.fail(e)
+        promise
       end
     end
   end

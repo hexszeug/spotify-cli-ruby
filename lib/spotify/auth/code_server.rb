@@ -5,6 +5,7 @@ require 'webrick'
 module Spotify
   module Auth
     module CodeServer
+      ##
       # raised by CodeServer.start when the system call to open the socket fails
       class OpenServerError < SpotifyError
         attr_reader :system_call_error
@@ -15,6 +16,7 @@ module Spotify
         end
       end
 
+      ##
       # raised when authorize endpoint denies request for authorization code
       # for possible error_str see https://www.rfc-editor.org/rfc/rfc6749#section-4.1.2.1
       class CodeDeniedError < SpotifyError
@@ -32,30 +34,31 @@ module Spotify
         HTTP_SERVER_CONFIG = Config::HTTP.update(Logger: BasicLog.new(nil, 0))
         HOST = URI(Spotify::Auth::REDIRECT_URL)
 
-        # returns:
-        # - Promise
+        ##
+        # does nothing if no block is given
         #
-        # raises:
-        # - OpenCodeServerError
+        # @param state [String] check requests for matching
+        #   states before handling
         #
-        # resolves:
-        # - String (code)
+        # @return [Promise]
+        # @return [String] code
         #
-        # resolves to errors:
-        # - CodeDeniedError
-        # - every error raised in Promise.resolve
+        # @raise [OpenCodeServerError]
+        # @raise [CodeDeniedError]
+        # @raise [StandardError] every exception raised in block
         def start(state, &)
           return unless block_given?
 
           @state = state
           @promise = Spotify::Promise.new(&).on_cancel { stop }
-          return if @server
+          return @promise if @server
 
           begin
             @server = TCPServer.new(HOST.hostname, HOST.port)
           rescue SystemCallError => e
             stop
-            raise OpenServerError, e
+            @promise.fail(OpenServerError.new(e))
+            return @promise
           end
           Thread.new do
             Thread.current.name = 'code-server/loop'
@@ -157,7 +160,7 @@ module Spotify
         end
 
         def generate_response(res, error = nil)
-          # TODO: generate prettier response pages
+          # @todo generate prettier response pages
           res.status = HTTPStatus::RC_BAD_REQUEST # default
           case error
           when nil
@@ -171,10 +174,10 @@ module Spotify
             res.body =
               error.state? ? "wrong state '#{error.state}'" : 'missing state'
           when CodeDeniedError
-            # TODO: prettier response: parse error_str from https://www.rfc-editor.org/rfc/rfc6749#section-4.1.2.1
+            # @todo prettier response: parse error_str from https://www.rfc-editor.org/rfc/rfc6749#section-4.1.2.1
             res.body = "access denied. #{error.error_str}"
           when Auth::TokenFetcher::TokenDeniedError
-            # TODO. prettier response: parse error_str form https://www.rfc-editor.org/rfc/rfc6749#section-5.2
+            # @todo prettier response: parse error_str form https://www.rfc-editor.org/rfc/rfc6749#section-5.2
             res.body = "token denied. #{error.error_str}"
           else
             res.status = HTTPStatus::RC_INTERNAL_SERVER_ERROR
