@@ -1,13 +1,15 @@
-source "https://rubygems.org"
+# frozen_string_literal: true
 
-gem "debug", require: false
-gem "prettier_print", require: false
-gem "syntax_tree", require: false
-gem "syntax_tree-haml", require: false
-gem "syntax_tree-rbs", require: false
+source 'https://rubygems.org'
 
-gem "launchy"
-gem "webrick"
-gem "curses"
+gem 'debug', require: false
+gem 'prettier_print', require: false
+gem 'syntax_tree', require: false
+gem 'syntax_tree-haml', require: false
+gem 'syntax_tree-rbs', require: false
 
-gem "test-unit"
+gem 'curses'
+gem 'launchy'
+gem 'webrick'
+
+gem 'test-unit'
