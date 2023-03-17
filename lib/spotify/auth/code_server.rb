@@ -154,7 +154,7 @@ module Spotify
         def report_error(res, promise, error)
           Thread.new do
             Thread.current.name = 'code-server/return/error'
-            promise.resolve_error error
+            promise.fail(error)
           end
           generate_response res, error
         end

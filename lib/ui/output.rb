@@ -91,6 +91,8 @@ module UI
       @generators.push(
         proc do
           lines = (yield @width).dup
+          next if lines.nil?
+
           lines = [lines] if lines.is_a?(String)
           return unless lines.is_a?(Array)
 

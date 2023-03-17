@@ -37,7 +37,7 @@ module UI
     end
 
     def touch
-      @refresh = true
+      @changed = true
     end
 
     def refresh

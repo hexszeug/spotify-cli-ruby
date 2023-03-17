@@ -18,7 +18,7 @@ module Spotify
       # @param & [Proc] *(optional)* set as callback for promise
       #
       # @return [Promise]
-      # @return [nil]2
+      # @return [nil]
       #
       # @raise [Prompt::OpenPromptError]
       # @raise [CodeServer::OpenServerError]

@@ -2,6 +2,7 @@
 
 require 'uri'
 require 'base64'
+require 'json'
 
 module Spotify
   module Auth
