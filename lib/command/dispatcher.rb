@@ -43,6 +43,9 @@ module Command
       sugs.sort
     end
 
+    ##
+    # @raise [CommandError]
+    # @raise [StandardError] every error raised in executer
     def execute(str)
       context = parse(str)
       context.last_tracked.execute(context)
