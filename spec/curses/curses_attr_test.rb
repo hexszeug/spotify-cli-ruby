@@ -1,6 +1,8 @@
-require "curses"
+# frozen_string_literal: true
 
-include Curses
+require 'curses'
+
+include Curses # rubocop:disable Style/MixinUsage
 
 init_screen
 start_color
