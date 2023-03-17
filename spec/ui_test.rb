@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 require './lib/ui'
-require './command'
+require './lib/command'
 
 include Command # rubocop:disable Style/MixinUsage
 
-dispatcher = CommandDispatcher.new
+dispatcher = Dispatcher.new
 dispatcher.register(
   literal('echo')
       .then(
