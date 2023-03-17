@@ -21,11 +21,12 @@ module Spotify
       # raised when token endpoint denies to request new / refresh token
       # for possible error_str see https://www.rfc-editor.org/rfc/rfc6749#section-5.2
       class TokenDeniedError < TokenFetchError
-        attr_reader :error_str
+        attr_reader :error_str, :error_description
 
-        def initialize(error_str)
+        def initialize(error_str, error_description)
           super()
           @error_str = error_str
+          @error_description = error_description
         end
       end
 
@@ -99,7 +100,12 @@ module Spotify
 
         def receive(res)
           body = JSON.parse(res.body, symbolize_names: true)
-          raise TokenDeniedError, body[:error] if body.key?(:error)
+          if body.key?(:error)
+            raise TokenDeniedError.new(
+              body[:error],
+              body[:error_description]
+            )
+          end
 
           body
         rescue JSON::JSONError

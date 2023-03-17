@@ -10,3 +10,4 @@ end
 require_relative 'spotify/auth'
 require_relative 'spotify/request'
 require_relative 'spotify/promise'
+require_relative 'spotify/api'

@@ -10,6 +10,7 @@ module Main
         Exit.new(@dispatcher)
         Echo.new(@dispatcher)
         Login.new(@dispatcher)
+        Me.new(@dispatcher)
       end
 
       def execute(str)
@@ -30,3 +31,4 @@ end
 require_relative 'def_cmd/exit'
 require_relative 'def_cmd/echo'
 require_relative 'def_cmd/login'
+require_relative 'def_cmd/me'
