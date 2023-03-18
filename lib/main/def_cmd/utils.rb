@@ -6,7 +6,7 @@ module Main
       def explain_error(error)
         <<~TEXT
           An error occured: #{error.class}
-          #{error.full_message}
+          #{error.backtrace.map { |s| "  #{s}" }.join("\n")}
         TEXT
       end
 

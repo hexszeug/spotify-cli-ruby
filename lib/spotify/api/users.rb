@@ -22,12 +22,16 @@ module Spotify
         # @param time_range [:long_term] several years
         # @param time_range [:medium_term] *(default)* 6 months
         # @param time_range [:short_term] 4 weeks
+        # @param pagination [API::Pagination]
         #
         # @return [page/artists]
         # @return [page/tracks]
-        def get_users_top_items(type:, time_range: :medium_term, &)
-          # @todo pagination
-          API.request("/me/top/#{type}", query: { time_range: }, &)
+        def get_users_top_items(type:, time_range: :medium_term,
+                                pagination: API::Pagination.new(20), &block)
+          pagination.with_limit(50, 50, callback: block) do |query|
+            query.update(time_range:)
+            API.request("/me/top/#{type}", query:)
+          end
         end
 
         ##

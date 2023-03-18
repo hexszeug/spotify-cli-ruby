@@ -119,7 +119,14 @@ module Spotify
 
       def make_request_args(endpoint, method, query, header, body)
         uri = URI(BASE_URL + endpoint)
-        uri.query = URI.encode_www_form(query)
+        uri.query = URI.encode_www_form(
+          query.transform_values do |v|
+            next '' if v.nil?
+            next v.join(',') if v.is_a?(Array)
+
+            next v
+          end
+        )
         header[:Authorization] = "Bearer #{Auth::Token.access_token}"
         header[:'Content-Type'] ||= 'application/json' if body
         body = JSON.generate(body) if body.is_a?(Hash)
@@ -147,8 +154,11 @@ module Spotify
         request_promise =
           Request.http(*args) do |res|
             res = receive(res)
-          rescue Unauthorized
-            raise unless Auth::Token.expired?
+          rescue Unauthorized => e
+            unless Auth::Token.expired?
+              promise.fail(e)
+              next
+            end
 
             refresh_promise = Auth::Token.refresh do
               async_request(args, promise:, retries:)
@@ -161,8 +171,11 @@ module Spotify
             promise.on_cancel { thread.kill }
             sleep e.retry_after
             async_request(args, promise:, retries: retries - 1)
-          rescue ServerError
-            raise if retries.zero?
+          rescue ServerError => e
+            if retries.zero?
+              promise.fail(e)
+              next
+            end
 
             async_request(args, promise:, retries: retries - 1)
           else
@@ -207,4 +220,8 @@ module Spotify
   end
 end
 
+require_relative 'api/pagination'
+
+require_relative 'api/search'
 require_relative 'api/users'
+require_relative 'api/player'
