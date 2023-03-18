@@ -26,11 +26,15 @@ module Spotify
         #
         # @return [page/artists]
         # @return [page/tracks]
-        def get_users_top_items(type:, time_range: :medium_term,
-                                pagination: API::Pagination.new(20), &block)
-          pagination.with_limit(50, 50, callback: block) do |query|
-            query.update(time_range:)
-            API.request("/me/top/#{type}", query:)
+        def get_users_top_items(
+          type:,
+          time_range: :medium_term,
+          pagination: API::Pagination.new(20),
+          &block
+        )
+          query = { time_range: }
+          pagination.with_limit(50, 50, callback: block) do |page|
+            API.request("/me/top/#{type}", query: query.merge(page))
           end
         end
 

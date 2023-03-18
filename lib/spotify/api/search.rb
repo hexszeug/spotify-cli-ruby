@@ -15,11 +15,19 @@ module Spotify
         #   [:show], [:episode], [:audiobook]
         # @param include_external [:audio] *(optional)* if provided display
         #   externally hostet audio as playable
-        def search_for_item(q:, type:, include_external: nil, &)
-          # @todo pagination
+        #
+        # @return [Hash] of [page] (of requested type)
+        def search_for_item(
+          q:, type:,
+          include_external: nil,
+          pagination: API::Pagination.new(20),
+          &block
+        )
           query = { q:, type: }
           query.update(include_external:) unless include_external.nil?
-          API.request('/search', query:, &)
+          pagination.with_limit(50, 1000, callback: block) do |page|
+            API.request('/search', query: query.merge(page))
+          end
         end
       end
     end

@@ -57,15 +57,38 @@ module Spotify
           return
         end
 
-        # @todo recursive search for pages
-        source[:items] += other[:items]
-        source[:offset] = other[:offset]
-        source[:next] = other[:next]
+        each_page_recursive(source, other) do |src, oth|
+          src[:items] += oth[:items]
+          src[:offset] = oth[:offset]
+          src[:next] = oth[:next]
+        end
       end
 
-      def next?(page)
-        # @todo recursive search for pages
-        page[:total] > page[:items].length
+      def next?(pagy)
+        nxt = false
+        each_page_recursive(pagy) do |page|
+          nxt = true unless page[:next].nil?
+        end
+        nxt
+      end
+
+      def each_page_recursive(*pagies, &)
+        if page?(pagies.first)
+          yield(*pagies)
+          return
+        end
+
+        pagies.first.each_key do |key|
+          pages = pagies.map { |pagy| pagy[key] }
+          next if pages.any?(&:nil?)
+
+          each_page_recursive(*pages, &)
+        end
+      end
+
+      def page?(obj)
+        obj[:items].is_a?(Array) &&
+          %i[offset limit total].all? { |key| obj[key].is_a?(Integer) }
       end
     end
   end

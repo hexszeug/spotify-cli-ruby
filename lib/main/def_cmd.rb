@@ -11,6 +11,7 @@ module Main
         Echo.new(@dispatcher)
         Account.new(@dispatcher)
         TopItems.new(@dispatcher)
+        Search.new(@dispatcher)
       end
 
       def execute(str)
@@ -34,3 +35,4 @@ require_relative 'def_cmd/exit'
 require_relative 'def_cmd/echo'
 require_relative 'def_cmd/account'
 require_relative 'def_cmd/top_items'
+require_relative 'def_cmd/search'
