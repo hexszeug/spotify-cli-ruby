@@ -93,12 +93,12 @@ module Spotify
       # @raise [Request::ConnectionError]
       # @raise [Request::ParsingError]
       # @raise [Request::TimeoutError]
+      # @raise [Auth::Token::NoTokenError]
       # @raise [Auth::Token::TokenParseError] superclass
-      # @raise [Auth::TokenNoTokenError]
-      # @raise [Auth::TokenMalformedTokenError]
-      # @raise [Auth::TokenMissingAccessTokenError]
-      # @raise [Auth::TokenMissingExpirationTimeError]
-      # @raise [Auth::TokenMissingRefreshTokenError]
+      # @raise [Auth::Token::MalformedTokenError]
+      # @raise [Auth::Token::MissingAccessTokenError]
+      # @raise [Auth::Token::MissingExpirationTimeError]
+      # @raise [Auth::Token::MissingRefreshTokenError]
       # @raise [Auth::TokenFetcher::TokenFetchError] superclass
       # @raise [Auth::TokenFetcher::ParseError]
       # @raise [Auth::TokenFetcher::TokenDeniedError]
@@ -206,3 +206,5 @@ module Spotify
     end
   end
 end
+
+require_relative 'api/users'

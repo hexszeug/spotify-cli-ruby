@@ -151,6 +151,7 @@ module Spotify
         # @raise [MissingExpirationTimeError]
         # @raise [MissingRefreshTokenError]
         def set(token)
+          return @token = nil if token.nil?
           raise MalformedTokenError unless token.instance_of?(Hash)
           raise MissingAccessTokenError unless token[:access_token]
           raise MissingRefreshTokenError unless token[:refresh_token] || @token
