@@ -42,23 +42,35 @@ module Spotify
           @token[:refresh_token]
         end
 
+        def expired?
+          return unless @token
+
+          Time.now.to_i >= @token[:expires_at]
+        end
+
         ##
         # saves token to config file
+        #
+        # @param [Boolean] *(optional)* save: doesnt raise if true
         #
         # @return [Hash] token
         #
         # @raise [NoTokenError]
-        def save
+        def save(save: false)
           raise NoTokenError unless @token
 
           token_json = JSON.pretty_generate(@token)
           FileUtils.mkpath(File.dirname(TOKEN_PATH))
           File.write TOKEN_PATH, "#{token_json}\n"
           @token
+        rescue NoTokenError
+          raise unless save
         end
 
         ##
         # loads token from config file
+        #
+        # @param [Boolean] *(optional)* save: doesnt raise if true
         #
         # @return [Hash] token
         #
@@ -67,13 +79,22 @@ module Spotify
         # @raise [MissingAccessTokenError]
         # @raise [MissingExpirationTimeError]
         # @raise [MissingRefreshTokenError]
-        def load
+        # @raise [Auth::TokenFetcher::TokenFetchError] superclass
+        # @raise [Request::RequestError] superclass
+        def load(save: false)
           raise NoTokenError unless File.file? TOKEN_PATH
 
-          set(JSON.parse(File.read(TOKEN_PATH), symbolize_names: true))
+          begin
+            set(JSON.parse(File.read(TOKEN_PATH), symbolize_names: true))
+          rescue JSON::JSONError
+            raise MalformedTokenError unless save
+          end
           refresh if @token[:expires_at] <= Time.now.to_i
-        rescue JSON::JSONError
-          raise MalformedTokenError
+        rescue NoTokenError,
+               TokenParseError,
+               Auth::TokenFetcher::TokenFetchError,
+               Request::RequestError
+          raise unless save
         end
 
         ##
@@ -89,10 +110,9 @@ module Spotify
         # @raise [MissingRefreshTokenError]
         # @raise [Auth::TokenFetcher::ParseError]
         # @raise [Auth::TokenFetcher::TokenDeniedError]
-        # @raise [Request::RequestError]
-        #
-        # @todo delete token when TokenDenied tells to do so
+        # @raise [Request::RequestError] superclass
         def refresh(&)
+          # @todo delete token when TokenDenied tells to do so
           unless block_given?
             begin
               raise NoTokenError unless @token

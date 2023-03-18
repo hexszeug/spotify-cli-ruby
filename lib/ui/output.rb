@@ -91,10 +91,10 @@ module UI
       @generators.push(
         proc do
           lines = (yield @width).dup
-          next if lines.nil?
+          next [] if lines.nil?
 
           lines = [lines] if lines.is_a?(String)
-          return unless lines.is_a?(Array)
+          next [] unless lines.is_a?(Array)
 
           lines = lines.join("\n").split("\n")
           lines.each.with_index do |line, i|
@@ -104,7 +104,7 @@ module UI
             e ||= @width
             s = line.index(/\S/, e) - e
             new_line = line.slice!(e...line.length)
-            next unless s && new_line
+            next [] unless s && new_line
 
             new_line.slice!(0...s)
             next if new_line.empty?
@@ -120,7 +120,9 @@ module UI
       amount = yield @height if block_given?
       return if amount.zero?
 
-      @scroll = (@scroll - amount).clamp(0, [@display.length - @height, 0].max)
+      @scroll = (@scroll - amount).clamp(
+        0, [@display.length - @height, 0].max
+      )
     end
   end
 end

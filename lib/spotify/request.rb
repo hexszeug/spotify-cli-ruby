@@ -24,9 +24,6 @@ module Spotify
     class TimeoutError < RequestError
     end
 
-    class CancelError < RequestError
-    end
-
     class ConnectionError < RequestError
     end
 
@@ -43,7 +40,6 @@ module Spotify
       # @raise [TimeoutError]
       # @raise [ConnectionError]
       # @raise [ParsingError]
-      # @raise [CancelError]
       def http(
         uri,
         method,
@@ -70,9 +66,7 @@ module Spotify
             else
               promise.resolve(res)
             end
-          return promise.on_cancel do
-                   thread.raise CancelError.new uri, method, header, body
-                 end
+          return promise.on_cancel { thread.kill }
         end
         begin
           timeout_thread =

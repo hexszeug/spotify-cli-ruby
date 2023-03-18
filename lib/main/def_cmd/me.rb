@@ -8,7 +8,11 @@ module Main
       def initialize(dispatcher)
         dispatcher.register(
           literal('me').executes do
-            UI.print(Spotify::API.request('/me').to_s)
+            Spotify::API.request('/me') do |user|
+              UI.print(user.to_s)
+            end.error do |e|
+              UI.print(e.class.to_s)
+            end
           end
         )
       end

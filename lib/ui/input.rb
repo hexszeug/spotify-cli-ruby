@@ -137,13 +137,13 @@ module UI
         @history_pointer = @history.length - 1
         move_cursor 0
       when 0x237 # CTRL+UP
-        Output.scroll(-1)
+        UI.output.scroll(-1)
       when PPAGE
-        Output.scroll { |h| 1 - h }
+        UI.output.scroll { |h| 1 - h }
       when 0x20e # CTRL+DOWN
-        Output.scroll 1
+        UI.output.scroll 1
       when NPAGE
-        Output.scroll { |h| h - 1 }
+        UI.output.scroll { |h| h - 1 }
       else
         return unless ch.is_a?(String) && ch =~ /^[[:print:]]$/
 

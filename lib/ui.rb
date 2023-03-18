@@ -10,30 +10,56 @@ module UI
     # blocks the current thread until stop_loop
     # is called or the process is killed
     def start_loop
+      unless Thread.current == Thread.main
+        raise ThreadError, 'not the main thread'
+      end
       return if @running
 
+      # initialize protection of stderr
+      abort_on_exception = Thread.abort_on_exception
+      report_on_exception = Thread.report_on_exception
+      Thread.abort_on_exception = true
+      Thread.report_on_exception = false
+
+      # initialite curses
       Curses.init_screen
       Curses.start_color
       Curses.noecho
       Curses.cbreak
       Curses.nl
 
+      # initialize io
       @input = Input.new
       @output = Output.new
 
+      # set initial sizes
       resize
 
-      @running = true
-      while @running
-        @input.read
-        @output.refresh
-        @input.refresh
+      # loop
+      begin
+        @running = true
+        while @running
+          @input.read
+          @output.refresh
+          @input.refresh
+        end
+      rescue Exception => e # rubocop:disable Lint/RescueException
+        Curses.close_screen
+        retry if @error_listener&.call(e)
+
+        raise
       end
+    ensure
+      # stop curses
+      Curses.close_screen
+
+      # reset stderr handling
+      Thread.abort_on_exception = abort_on_exception
+      Thread.report_on_exception = report_on_exception
     end
 
     def stop_loop
       @running = false
-      Curses.close_screen
     end
 
     def print(str = nil, &)
@@ -45,6 +71,12 @@ module UI
       @return_listener = block
     end
 
+    def errors(&block)
+      @error_listener = block
+    end
+
+    ##
+    # **internal use only**
     def on_return(str)
       @return_listener&.call(str)
     end
