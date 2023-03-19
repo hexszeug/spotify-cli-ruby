@@ -87,7 +87,7 @@ module Spotify
           begin
             set(JSON.parse(File.read(TOKEN_PATH), symbolize_names: true))
           rescue JSON::JSONError
-            raise MalformedTokenError unless save
+            raise MalformedTokenError
           end
           refresh if @token[:expires_at] <= Time.now.to_i
         rescue NoTokenError,
