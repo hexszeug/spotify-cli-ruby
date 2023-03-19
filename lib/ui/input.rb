@@ -61,6 +61,10 @@ module UI
       ch = @win.get_char
       return unless ch
 
+      # read_* return values:
+      # false: no match
+      # nil: match but no action performed
+      # true: match and change performed
       info = {}
       info[:resize] = read_resize(ch)
       info[:delete] = read_delete(ch)
@@ -71,6 +75,8 @@ module UI
       info[:return] = read_return(ch)
 
       info[:char] = read_char(ch) if info.values.all?(false)
+
+      insert_suggestion if info[:suggest]
 
       @changed = true if info.values.any?(true)
       nil
@@ -191,37 +197,35 @@ module UI
     end
 
     def read_suggest(char)
-      # @todo outsource suggestion fetching, replacement, etc.
-      word = @string.match(/(?:\A| )([^ ]*)$/)[1] # extracts last word
-      last_sugg = @suggestions[@suggestion_cursor]
-
+      @suggestion_cursor = -1 unless @suggesting
       case char
       when "\t"
         @suggestion_cursor += 1
       when BTAB
-        @suggestion_cursor -= 1
+        @suggestion_cursor -= 1 if @suggesting
       else
         @suggesting = false
         return false
       end
+      return unless @cursor > (@string.rindex(' ') || 0)
 
-      @suggestions = UI.on_suggest(@string.dup) unless @suggesting
-      if @suggestions.empty?
-        @suggesting = false
-        @suggestion_cursor = -1
-        return
+      unless @suggesting
+        @suggestions = UI.on_suggest(@string[...@cursor])
+        return if @suggestions.empty?
       end
 
       last_index = @suggestions.length - 1
       @suggestion_cursor = 0 if @suggestion_cursor > last_index
       @suggestion_cursor = last_index if @suggestion_cursor.negative?
-
-      @string.delete_suffix!(@suggesting ? last_sugg : word)
-      @string.concat(@suggestions[@suggestion_cursor])
-      move_cursor(@string.length)
-
       @suggesting = true
       true
+    end
+
+    def insert_suggestion
+      word = @string.match(/(?:\A| )([^ ]*)$/)[1] # extracts last word
+      @string.delete_suffix!(word)
+      @string.concat(@suggestions[@suggestion_cursor])
+      move_cursor(@string.length)
     end
 
     def read_return(char)
