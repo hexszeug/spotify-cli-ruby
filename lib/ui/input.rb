@@ -19,6 +19,9 @@ module UI
       @history_pointer = 0
       @changed = false
       @display_size = 0
+      @suggestions = []
+      @suggesting = false
+      @suggestion_cursor = -1
     end
 
     def resize
@@ -58,9 +61,35 @@ module UI
       ch = @win.get_char
       return unless ch
 
-      case ch
+      info = {}
+      info[:resize] = read_resize(ch)
+      info[:delete] = read_delete(ch)
+      info[:cursor] = read_cursor_move(ch)
+      info[:scroll] = read_scroll(ch)
+      info[:history] = read_history(ch)
+      info[:suggest] = read_suggest(ch)
+      info[:return] = read_return(ch)
+
+      info[:char] = read_char(ch) if info.values.all?(false)
+
+      @changed = true if info.values.any?(true)
+      nil
+    end
+
+    private
+
+    def read_resize(char)
+      case char
       when RESIZE
         UI.resize
+      else
+        return false
+      end
+      true
+    end
+
+    def read_delete(char)
+      case char
       when BACKSPACE
         return unless @cursor.positive?
 
@@ -83,6 +112,14 @@ module UI
 
         i = @string.index(/ [^ ]/, @cursor)
         @string.slice! @cursor..i
+      else
+        return false
+      end
+      true
+    end
+
+    def read_cursor_move(char)
+      case char
       when LEFT
         return unless @cursor.positive?
 
@@ -110,6 +147,30 @@ module UI
         return unless @cursor < @string.length
 
         move_cursor @string.length
+      else
+        return false
+      end
+      true
+    end
+
+    def read_scroll(char)
+      case char
+      when 0x237 # CTRL+UP
+        UI.output.scroll(-1)
+      when PPAGE
+        UI.output.scroll { |h| 1 - h }
+      when 0x20e # CTRL+DOWN
+        UI.output.scroll 1
+      when NPAGE
+        UI.output.scroll { |h| h - 1 }
+      else
+        return false
+      end
+      true
+    end
+
+    def read_history(char)
+      case char
       when UP
         return unless @history_pointer.positive?
 
@@ -123,10 +184,52 @@ module UI
         @string = @history[@history_pointer]
         @string = @string.dup if @history_pointer < @history.length - 1
         move_cursor @string.length
+      else
+        return false
+      end
+      true
+    end
+
+    def read_suggest(char)
+      # @todo outsource suggestion fetching, replacement, etc.
+      word = @string.match(/(?:\A| )([^ ]*)$/)[1] # extracts last word
+      last_sugg = @suggestions[@suggestion_cursor]
+
+      case char
+      when "\t"
+        @suggestion_cursor += 1
+      when BTAB
+        @suggestion_cursor -= 1
+      else
+        @suggesting = false
+        return false
+      end
+
+      @suggestions = UI.on_suggest(@string.dup) unless @suggesting
+      if @suggestions.empty?
+        @suggesting = false
+        @suggestion_cursor = -1
+        return
+      end
+
+      last_index = @suggestions.length - 1
+      @suggestion_cursor = 0 if @suggestion_cursor > last_index
+      @suggestion_cursor = last_index if @suggestion_cursor.negative?
+
+      @string.delete_suffix!(@suggesting ? last_sugg : word)
+      @string.concat(@suggestions[@suggestion_cursor])
+      move_cursor(@string.length)
+
+      @suggesting = true
+      true
+    end
+
+    def read_return(char)
+      case char
       when ENTER, "\n", "\r"
         return if @string.empty?
 
-        UI.on_return @string.dup
+        UI.on_return(@string.dup)
         if @history[-2] == @string
           @history[-1] = @string
         else
@@ -136,25 +239,19 @@ module UI
         @string.clear
         @history_pointer = @history.length - 1
         move_cursor 0
-      when 0x237 # CTRL+UP
-        UI.output.scroll(-1)
-      when PPAGE
-        UI.output.scroll { |h| 1 - h }
-      when 0x20e # CTRL+DOWN
-        UI.output.scroll 1
-      when NPAGE
-        UI.output.scroll { |h| h - 1 }
       else
-        return unless ch.is_a?(String) && ch =~ /^[[:print:]]$/
-
-        @string.insert @cursor, ch
-        move_cursor @cursor + 1
+        return false
       end
-      @changed = true
-      nil
+      true
     end
 
-    private
+    def read_char(char)
+      return false unless char.is_a?(String) && char =~ /^[[:print:]]$/
+
+      @string.insert(@cursor, char)
+      move_cursor(@cursor + 1)
+      true
+    end
 
     def move_cursor(cursor)
       return if !cursor.between?(0, @string.length) || cursor == @cursor

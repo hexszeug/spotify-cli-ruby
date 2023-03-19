@@ -108,6 +108,7 @@ module Main
           Login started. A browser window should pop up.
         TEXT
         @login = Spotify::Auth.login do
+          @login = nil
           UI.print <<~TEXT
             You successfully logged in.
           TEXT

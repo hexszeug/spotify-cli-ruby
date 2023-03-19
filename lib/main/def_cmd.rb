@@ -15,15 +15,15 @@ module Main
       end
 
       def execute(str)
-        # @todo rescue exceptions raised in execute commands
         @dispatcher.execute(str)
       rescue Command::CommandError => e
-        UI.print(e.message)
+        raise UI::Error, e.message
       end
 
       def suggest(str)
-        # @todo rescue [Command::CommandError] and report to suggestions
         @dispatcher.suggest(str)
+      rescue Command::CommandError => e
+        raise UI::Error, e.message
       end
     end
   end

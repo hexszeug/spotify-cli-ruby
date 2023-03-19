@@ -13,6 +13,7 @@ Spotify::Auth::Token.load(save: true)
 
 Main::DefCmd.create
 UI.returns { |str| Main::DefCmd.execute(str) }
+UI.suggests { |str| Main::DefCmd.suggest(str) }
 UI.errors do
   Spotify::Auth::Token.save
   false

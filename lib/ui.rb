@@ -3,6 +3,19 @@
 require 'curses'
 
 module UI
+  ##
+  # return listener or suggestion provider may raise this error
+  # it is automatically rescued and printed to the output
+  class Error < StandardError
+    attr_reader :print_msg
+
+    def initialize(print_msg)
+      super()
+
+      @print_msg = print_msg
+    end
+  end
+
   class << self
     attr_reader :input, :output
 
@@ -71,6 +84,10 @@ module UI
       @return_listener = block
     end
 
+    def suggests(&block)
+      @suggestion_provider = block
+    end
+
     def errors(&block)
       @error_listener = block
     end
@@ -79,6 +96,18 @@ module UI
     # **internal use only**
     def on_return(str)
       @return_listener&.call(str)
+    rescue Error => e
+      print(e.print_msg)
+    end
+
+    ##
+    # **internal use only**
+    def on_suggest(str, return_errors: false)
+      @suggestion_provider&.call(str) || []
+    rescue Error => e
+      return e if return_errors
+
+      []
     end
 
     ##
