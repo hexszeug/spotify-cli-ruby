@@ -41,6 +41,9 @@ module UI
       Curses.cbreak
       Curses.nl
 
+      # start colors
+      Colors.start
+
       # initialize io
       @input = Input.new
       @output = Output.new
@@ -63,6 +66,9 @@ module UI
         raise
       end
     ensure
+      # stop colors
+      Colors.stop
+
       # stop curses
       Curses.close_screen
 
@@ -140,5 +146,6 @@ module UI
   end
 end
 
+require_relative 'ui/colors'
 require_relative 'ui/input'
 require_relative 'ui/output'
