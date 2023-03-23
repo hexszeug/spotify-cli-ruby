@@ -42,19 +42,37 @@ module UI
     REGEXP
 
     def initialize(markup)
-      read_markup(markup)
-    end
-
-    def update(markup)
-      read_markup(markup)
+      update(markup)
     end
 
     def changed? = @changed
 
+    ##
+    # Sets the new content of the message to `markup`.
+    # Can be overwritten by subclasses to implement custom behavior.
+    #
+    def update(markup)
+      read_markup(markup)
+    end
+
+    ##
+    # Returns the lines in the message and inserts line breaks when needed.
+    # Can be overwritten by subclasses to implement custom behavior.
+    #
+    # @param max_length [Integer]
+    #
+    # @return [Array] of [Array] of [String|Hash] (hashes are markup tokens)
+    def lines(max_length)
+      @lines.map { |line| line_break(line, max_length) }.flatten
+    end
+
     private
+
+    # @todo move markup related methods to own utility module
 
     ##
     # markup text may contain the following control sequences escaped by `$`:
+    # @todo correct doc (add single letter colors, make more undestandable)
     #
     # `0` + *symbol* = reset symbol
     # `1` + *symbol* = set symbol
@@ -143,6 +161,11 @@ module UI
           nil
         end.compact
       end
+    end
+
+    def line_break(line, _max_length)
+      # @todo implement
+      line
     end
   end
 end
