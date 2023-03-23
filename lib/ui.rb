@@ -147,5 +147,6 @@ module UI
 end
 
 require_relative 'ui/colors'
+require_relative 'ui/screenmessage'
 require_relative 'ui/input'
 require_relative 'ui/output'
