@@ -116,7 +116,7 @@ module UI
 
         # colors
         if token_str.start_with?('#')
-          color = Colors.hex_color_id(token_str[1..6])
+          color = Colors.hex_color_id(token_str[..6])
           key = token_str[7] == 'b' ? :bg_color : :color
           return { key => color }
         end

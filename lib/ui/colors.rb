@@ -45,7 +45,12 @@ module UI
       def hex_color_id(hex_color)
         return -1 unless hex_color =~ /#[0-9a-fA-f]{6}/
 
-        color_array_hex = hex_color[1..6].each_slice(2) { |v| v.to_i(16) }.to_a
+        color_array_hex =
+          hex_color[1..6]
+          .each_char
+          .each_slice(2)
+          .map { |m, l| (m + l).to_i(16) }
+          .to_a
         color_array =
           transform_base(color_array_hex, STR_COLOR_BASE, @color_base)
         encode_int_color(color_array) + COLOR_SCHEME_SIZE

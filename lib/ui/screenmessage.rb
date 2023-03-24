@@ -56,9 +56,12 @@ end
 
 # @todo remove debug script
 if caller.empty?
+  require 'curses'
   require_relative 'colors'
+  UI::Colors.start
+  Curses.close_screen
   require_relative 'markup'
   UI::ScreenMessage.new <<~TEXT
-    Lorem 500$$$$$r whats that
+    Lorem 500$$$$$#aaaaaa whats that
   TEXT
 end
