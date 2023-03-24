@@ -2,19 +2,21 @@
 
 module UI
   ##
-  # Module providing utility function for handling **markup text**.
+  # Module providing utility function for handling markup texts.
   #
-  # A **markup text** is a string which can cointain markup sequences
-  # escaped by `$`. You can escape it with `$$` to use the character.
-  # **WARNING:** Each new markup sequence has to be escaped independently
-  # by `$` even if it is next to another. (`$r$*` not `$r*`)
+  # ## Markup sequences
+  # Markup sequences are escaped by `$`.
+  # *(`$$` produces a single dolor sign in the text.)*
+  # Each new markup sequence has to be escaped independently.
+  # You cannot implicitly chain them.
+  # (`$r*` doesn't work but `$r$*` does.)
   #
   # There are three types of markup sequences:
   # - color modifiers
   # - attribute modifiers
   # - special reset sequences
   #
-  # **Color modifiers:**
+  # ### Color modifiers:
   # A hex color code like `#29abe3`.
   #
   # Additionally there are some short forms for frequently used colors
@@ -34,8 +36,10 @@ module UI
   #
   # Color modifiers can be suffixed by a `b` to
   # set the background color instead of the foreground.
+  # **If and ONLY IF the color change is followed by a `b` you can
+  # explicitly specify that you set the foreground color with a `f`.**
   #
-  # **Attribute modifiers:**
+  # ### Attribute modifiers:
   # - `*` bold
   # - `_` underline
   # - `!` reverse
@@ -46,7 +50,7 @@ module UI
   # - `0` reset
   # - `1` set
   #
-  # **Special reset sequences:**
+  # ### Special reset sequences:
   # There are some special reset sequences listed here:
   # - `0a` reset all attributes
   # - `0c` reset forground color (to terminal's default)
@@ -82,8 +86,10 @@ module UI
       (
         (?:
           \\$ |
-          # [0-9a-fA-F]{6} b? |
-          [#{UI::Markup::COLORS.keys.join}] b? |
+          (?:
+            # [0-9a-fA-F]{6} |
+            [#{UI::Markup::COLORS.keys.join}]
+          )(?: b | f (?=b))? |
           [#{UI::Markup::ATTR_PREFIXES.keys.join}]? [#{UI::Markup::ATTRIBUTES.keys.join}] |
           0 [#{UI::Markup::RESETS.keys.join}]
         )?
