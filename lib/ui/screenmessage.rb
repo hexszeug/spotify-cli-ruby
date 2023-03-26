@@ -10,10 +10,14 @@ module UI
 
     ##
     # Sets the new content of the message to `markup`.
-    # Can be overwritten by subclasses to implement custom behavior.
+    # **Must not be overwritten!
+    # To change behavior of subclasses overwrite
+    # the private method `read_content`.**
     #
     def update(markup)
-      read_markup(markup)
+      @changed = true
+      read_content(markup)
+      self
     end
 
     ##
@@ -24,24 +28,23 @@ module UI
     #
     # @return [Array] of [Array] of [String|Hash] (hashes are markup tokens)
     def lines(max_length)
+      @changed = false
       @lines.collect_concat { |line| line_break(line, max_length) }
     end
 
     private
 
-    def read_markup(markup)
-      raise ArgumentError, 'not a string' unless markup.is_a?(String)
-
-      @changed = true
+    ##
+    # Can be overwitten by subclasses for cutom behaviour
+    def read_content(markup)
       if markup.empty?
-        @lines = ['']
+        @lines = [['']]
         return
       end
 
       @lines = markup.split(/\n|\r\n/).map do |line|
         Markup.parse(line)
       end
-      nil
     end
 
     def line_break(long_line, max_length)
@@ -89,26 +92,4 @@ module UI
       [line_a, line_b]
     end
   end
-end
-
-# @todo remove debug script
-if caller.empty?
-  require 'curses'
-  require_relative 'markup'
-
-  Curses.init_screen
-  UI::Markup::Colors.start
-
-  sm = UI::ScreenMessage.new <<~TEXT
-    $0ALorem ipsum $*dolor$* sit amet, $_consetetur$_ sadipscing elitr,
-    $~sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat,$~
-    $#163264bsed diam voluptua.$0b
-    - Julien $rfBam
-  TEXT
-
-  UI::Markup.print_lines(Curses.stdscr, sm.lines(Curses.cols))
-
-  Curses.getch
-
-  Curses.close_screen
 end
