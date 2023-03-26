@@ -3,11 +3,8 @@
 module UI
   module Markup
     module Colors
-      COLOR_SCHEME_SIZE = 16
-
       class << self
-        DISTINCT_POSITIVE_VALUES_C_SIGNED_SHORT = 0x8000
-
+        COLOR_SCHEME_SIZE = 16
         CURSES_COLOR_BASE = 1001
         STR_COLOR_BASE = 256
 
@@ -18,17 +15,18 @@ module UI
           Curses.use_default_colors
 
           @distinct_colors = Curses.colors
-          @distinct_pairs =
-            [Curses.color_pairs, DISTINCT_POSITIVE_VALUES_C_SIGNED_SHORT].min
-          return @enabled = false if @distinct_colors < COLOR_SCHEME_SIZE
-
-          COLOR_SCHEME_SIZE.times do |i|
-            Curses.init_pair(i + 1, i, -1)
+          @pairs = Hash.new do |hash, key|
+            if key.is_a?(Array) &&
+               key.length == 2 &&
+               Curses.init_pair((id = hash.length), *key)
+              hash[key] = id
+            else
+              0
+            end
           end
+          @pairs[[-1, -1]]
 
-          unless (@enabled_hex = @distinct_colors > COLOR_SCHEME_SIZE)
-            return true
-          end
+          return 0 unless (@enabled_hex = @distinct_colors > COLOR_SCHEME_SIZE)
 
           @color_base =
             [Math.cbrt(@distinct_colors - COLOR_SCHEME_SIZE).to_i, 256].min
@@ -39,13 +37,18 @@ module UI
               transform_base(color_array, @color_base, CURSES_COLOR_BASE)
             Curses.init_color(i + COLOR_SCHEME_SIZE, *curses_color)
           end
+          @distinct_hex_colors
         end
 
-        def stop; end
+        def stop
+          @enabled = @enabled_hex = false
+        end
 
         ##
-        #
+        # @param hex_color [String] `#a3047b` for example
+        # @return [Integer] the color id of the color
         def hex_color_id(hex_color)
+          return unless @enabled_hex
           return -1 unless hex_color =~ /#[0-9a-fA-f]{6}/
 
           color_array_hex =
@@ -57,6 +60,12 @@ module UI
           color_array =
             transform_base(color_array_hex, STR_COLOR_BASE, @color_base)
           encode_int_color(color_array) + COLOR_SCHEME_SIZE
+        end
+
+        ##
+        #
+        def color_pair(foreground, background)
+          @pairs[[foreground, background]] if @enabled
         end
 
         private

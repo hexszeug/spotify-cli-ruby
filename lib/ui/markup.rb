@@ -142,7 +142,7 @@ module UI
       end
 
       def print_lines(window, lines, range = 0.., state: {})
-      state = merge_markup_tokens(RESET_STATE, state)
+        state = merge_markup_tokens(RESET_STATE, state)
         state = lines[...range.begin].collect_concat do |line|
           line.grep(Hash)
         end.reduce(state) do |*tokens|
@@ -212,7 +212,9 @@ module UI
             CURSES_ATTRIBUTES[key]
           end.reduce(0, :|)
         )
-        # @todo set color
+        window.color_set(
+          Colors.color_pair(state[:color], state[:bg_color])
+        )
       end
     end
   end
