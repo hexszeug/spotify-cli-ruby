@@ -27,12 +27,12 @@ module Main
           type:,
           pagination: Spotify::API::Pagination.new
         ) do |page|
-          UI.print <<~TEXT
+          UI.print_raw <<~TEXT
             Your top #{type}
             #{page[:items].map { |v| v[:name] }.join("\n")}
           TEXT
         end.error do |e|
-          UI.print explain_error(e)
+          UI.print_raw explain_error(e)
         end
       end
     end

@@ -22,7 +22,7 @@ module Main
         Spotify::API::Search.search_for_item(
           q:, type:, pagination: Spotify::API::Pagination.new
         ) do |page|
-          UI.print <<~TEXT
+          UI.print_raw <<~TEXT
             Serach results:
             #{
               page.keys.map do |key|
@@ -34,7 +34,7 @@ module Main
             }
           TEXT
         end.error do |e|
-          UI.print explain_error(e)
+          UI.print_raw explain_error(e)
         end
       end
     end

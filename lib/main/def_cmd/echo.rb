@@ -8,10 +8,10 @@ module Main
       def initialize(dispatcher)
         dispatcher.register(
           literal('echo').executes do
-            UI.print('')
+            UI.print_raw('')
           end.then(
             Arguments::GreedyString.new(:str).executes do |ctx|
-              UI.print(ctx[:str])
+              UI.print_raw(ctx[:str])
             end
           )
         )

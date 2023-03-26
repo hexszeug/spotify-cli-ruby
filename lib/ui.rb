@@ -81,9 +81,12 @@ module UI
       @running = false
     end
 
-    def print(str = nil, &)
-      @output&.print { str } unless str.nil?
-      @output&.print(&) if block_given?
+    def print_raw(str)
+      @output&.print(ScreenMessage.new(str))
+    end
+
+    def print(screen_message)
+      @output&.print(screen_message)
     end
 
     def returns(&block)
@@ -103,7 +106,7 @@ module UI
     def on_return(str)
       @return_listener&.call(str)
     rescue Error => e
-      print(e.print_msg)
+      print_raw("$r#{e.print_msg}")
     end
 
     ##

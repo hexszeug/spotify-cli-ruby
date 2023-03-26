@@ -129,6 +129,7 @@ module UI
       # @param state [Hash]
       def print(window, markup, state: {})
         state = merge_markup_tokens(RESET_STATE, state)
+        apply_state(window, state)
         markup.each do |token|
           if token.is_a?(String)
             window.addstr(token)
@@ -141,15 +142,16 @@ module UI
         state
       end
 
-      def print_lines(window, lines, range = 0.., state: {})
+      def print_lines(window, lines, range = nil.., state: {})
         state = merge_markup_tokens(RESET_STATE, state)
-        state = lines[...range.begin].collect_concat do |line|
+        state = lines[...(range.begin || 0)].collect_concat do |line|
           line.grep(Hash)
         end.reduce(state) do |*tokens|
           merge_markup_tokens(*tokens)
         end
-        lines[range].each do |line|
-          state = print(window, line + ["\n"], state:)
+        lines[range].each_with_index do |line, i|
+          line.push("\n") unless i == lines[range].length - 1
+          state = print(window, line, state:)
         end
         state
       end

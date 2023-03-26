@@ -8,9 +8,10 @@ module UI
       @win.keypad(true)
       @win.scrollok(true)
 
-      @generators = []
-      @old_generators_length = 0
+      @screen_messages = []
       @display = []
+      @first_displayed_message = -1
+      @first_undisplayed_message = 0
       @scroll = 0
       @old_scroll = 0
       @height = 0
@@ -31,53 +32,41 @@ module UI
 
     def refresh(force: false)
       # @todo add scroll bar
-      changed_output = @generators.length != @old_generators_length
-      changed_size = @changed_size
-      scrolled = @scroll != @old_scroll
-      return unless changed_output || changed_size || scrolled || force
-
-      if changed_size || force
-        @display = []
-        @generators.each do |gen|
-          lines = gen.call
-          next unless lines
-
-          @display += lines
-        end
-        @scroll = @scroll.clamp(0, [@display.length - @height, 0].max)
-        @win.clear
-        @win.setpos [@height - @display.length, 0].max, 0
-        s = [@display.length - @height - @scroll, 0].max
-        e = @display.length - @scroll - 1
-        @win.addstr @display[s..e] * "\n"
-      elsif changed_output
-        @scroll = 0
-        new_lines = 0
-        @generators[@old_generators_length..nil].each do |gen|
-          lines = gen.call
-          @display += lines
-          new_lines += lines.length
-        end
-        @win.scrl new_lines
-        @win.setpos [@height - new_lines, 0].max, 0
-        s = @display.length - [new_lines, @height].min
-        @win.addstr @display[s..nil] * "\n"
-      elsif scrolled
-        amount = @old_scroll - @scroll
-        s = [@display.length - @height - @scroll, 0].max
-        e = @display.length - @scroll - 1
-        c = 0
-        if amount.positive?
-          s = [e - amount + 1, s].max
-          c = @height - e + s - 1
-        else
-          e = [s - amount - 1, e].min
-        end
-        @win.scrl amount
-        @win.setpos c, 0
-        @win.addstr @display[s..e] * "\n"
+      # @todo stop scrolling when reaching end of generators
+      force = true if @changed_size
+      first_change = @screen_messages.find_index(&:changed?)
+      first_change = 0 if force
+      if first_change && @scroll != @old_scroll
+        # special case: scrolled and updated message in same tick
+        @first_undisplayed_message = @screen_messages.length
       end
-      @old_generators_length = @generators.length
+      if first_change && first_change <= @first_undisplayed_message
+        # generate
+        generate_least_as_possible(first_change, force)
+
+        # print
+        messages =
+          @display[@first_displayed_message...@first_undisplayed_message].reverse
+        lines_before = @display[...@first_displayed_message].map(&:length).sum
+        lines_in = messages.map(&:length).sum
+        bottom_cutoff = @scroll - lines_before
+        top_cutoff = lines_in - @height - bottom_cutoff
+        @win.setpos([-top_cutoff, 0].max, 0)
+        messages.each_with_index do |lines, i|
+          start = [top_cutoff, 0].max if i.zero?
+          stop = -(bottom_cutoff + 1) if i == messages.length - 1
+          Markup.print_lines(@win, lines, start..stop)
+        end
+      elsif @scroll != @old_scroll
+        # @todo scroll display
+        # generate
+        if @scroll > @old_scroll
+          generate_least_as_possible(@first_undisplayed_message, true)
+        end
+      else
+        return
+      end
+
       @changed_size = false
       @old_scroll = @scroll
 
@@ -85,44 +74,56 @@ module UI
       UI.input.touch
     end
 
-    def print
-      return unless block_given?
+    def print(screen_message)
+      return unless screen_message.is_a?(ScreenMessage)
 
-      @generators.push(
-        proc do
-          lines = (yield @width).dup
-          next [] if lines.nil?
-
-          lines = [lines] if lines.is_a?(String)
-          next [] unless lines.is_a?(Array)
-
-          lines = lines.join("\n").split("\n")
-          lines.each.with_index do |line, i|
-            next unless line.length > @width
-
-            e = line.rindex(/\s/, @width)
-            e ||= @width
-            s = line.index(/\S/, e) - e
-            new_line = line.slice!(e...line.length)
-            next [] unless s && new_line
-
-            new_line.slice!(0...s)
-            next if new_line.empty?
-
-            lines.insert(i + 1, new_line)
-          end
-          lines
-        end
-      )
+      @screen_messages.unshift(screen_message)
+      @display.unshift([])
     end
 
     def scroll(amount = 0)
       amount = yield @height if block_given?
       return if amount.zero?
 
-      @scroll = (@scroll - amount).clamp(
-        0, [@display.length - @height, 0].max
-      )
+      @scroll = [(@scroll - amount), 0].max
+    end
+
+    private
+
+    def generate_least_as_possible(offset, force)
+      generated_lines = @display[...offset].map(&:length).sum
+      @first_displayed_message = offset
+      @first_undisplayed_message = offset
+      @screen_messages[offset..]
+        .each
+        .with_index(offset) do |message, i|
+        @display[i] = message.lines(@width) if force || message.changed?
+        generated_lines += @display[i].length
+        @first_displayed_message += 1 unless generated_lines >= @scroll
+        break if generated_lines >= @scroll + @height
+
+        @first_undisplayed_message += 1
+      end
+    end
+
+    def print_display(offset = 0)
+      # @todo still in work
+      messages =
+        @display[@first_displayed_message...@first_undisplayed_message].reverse
+      lines_before = @display[...@first_displayed_message].map(&:length).sum
+      lines_in = messages.map(&:length).sum
+      bottom_cutoff = @scroll - lines_before
+      top_cutoff = lines_in - @height - bottom_cutoff
+      bottom_cutoff -= offset if offset.negative?
+      top_cutoff -= offset if offset.positive?
+      top_cutoff.clamp(0, lines_in)
+      bottom_cutoff.clamp(0, lines_in)
+      @win.setpos([-top_cutoff, 0].max, 0)
+      messages.each_with_index do |lines, i|
+        start = top_cutoff.max if i.zero?
+        stop = -(bottom_cutoff + 1) if i == messages.length - 1
+        Markup.print_lines(@win, lines, start..stop)
+      end
     end
   end
 end
