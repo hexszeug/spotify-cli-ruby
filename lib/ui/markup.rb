@@ -150,7 +150,7 @@ module UI
           merge_markup_tokens(*tokens)
         end
         lines[range].each_with_index do |line, i|
-          line.push("\n") unless i == lines[range].length - 1
+          line += ["\n"] unless i == lines[range].length - 1
           state = print(window, line, state:)
         end
         state
