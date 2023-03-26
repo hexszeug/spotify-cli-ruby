@@ -58,29 +58,41 @@ module UI
   # - `0C` reset foreground and background color
   # - `0A` reset attributes, forground and background color
   module Markup
+    # colors
     COLORS = %w[D R G Y B P C W d r g y b p c w].each_with_index.to_h.freeze
-    ATTRIBUTES = {
-      '*' => :bold,
-      '_' => :underline,
-      '!' => :reverse,
-      '~' => :blink,
-      '%' => :dim
-    }.freeze
+
+    # attributes
+    attrs = {
+      bold: ['*', Curses::A_BOLD],
+      underline: ['_', Curses::A_UNDERLINE],
+      reverse: ['!', Curses::A_REVERSE],
+      blink: ['~', Curses::A_BLINK],
+      dim: ['%', Curses::A_DIM]
+    }
+    ATTRIBUTES =
+      attrs.transform_values(&:first).invert.freeze
+    CURSES_ATTRIBUTES = Hash.new(0).update(
+      attrs.transform_values(&:last)
+    ).freeze
+
+    # attrubute prefixes
     ATTR_PREFIXES = Hash.new(:toggle).update(
       '0' => :reset,
       '1' => :set
     ).freeze
-    RESETS =
-      begin
-        resets = {
-          'c' => { color: -1 },
-          'b' => { bg_color: -1 },
-          'C' => { color: -1, bg_color: -1 },
-          'a' => ATTRIBUTES.each_value.to_h { |key| [key, :reset] }
-        }
-        resets['A'] = resets.each_value.reduce(:merge)
-        resets.freeze
-      end
+
+    # resets
+    resets = {
+      'c' => { color: -1 }.freeze,
+      'b' => { bg_color: -1 }.freeze,
+      'C' => { color: -1, bg_color: -1 }.freeze,
+      'a' => ATTRIBUTES.each_value.to_h { |key| [key, :reset] }.freeze
+    }
+    RESET_STATE = resets.each_value.reduce(:merge).freeze
+    resets['A'] = RESET_STATE
+    RESETS = resets.freeze
+
+    # regexp
     REGEXP = Regexp.new(<<~REGEXP.gsub(/\s/, '')).freeze
       \\$
       (
@@ -106,9 +118,40 @@ module UI
       def parse(markup)
         markup.split(REGEXP).map.with_index do |str, i|
           i.even? ? str : parse_markup_token(str)
-        end.delete_if(&:empty?).chunk(&:class).map do |klass, values|
+        end.reject(&:empty?).chunk(&:class).map do |klass, values|
           klass == String ? values.join : merge_markup_tokens(*values)
         end
+      end
+
+      ##
+      # @param window [Curses::Window]
+      # @param markup [Array]
+      # @param state [Hash]
+      def print(window, markup, state: {})
+        state = merge_markup_tokens(RESET_STATE, state)
+        markup.each do |token|
+          if token.is_a?(String)
+            window.addstr(token)
+            next
+          end
+
+          state = merge_markup_tokens(state, token)
+          apply_state(window, state)
+        end
+        state
+      end
+
+      def print_lines(window, lines, range = 0.., state: {})
+      state = merge_markup_tokens(RESET_STATE, state)
+        state = lines[...range.begin].collect_concat do |line|
+          line.grep(Hash)
+        end.reduce(state) do |*tokens|
+          merge_markup_tokens(*tokens)
+        end
+        lines[range].each do |line|
+          state = print(window, line + ["\n"], state:)
+        end
+        state
       end
 
       private
@@ -159,6 +202,17 @@ module UI
             nil
           end.compact
         end
+      end
+
+      def apply_state(window, state)
+        window.attrset(
+          state.filter do |key, value|
+            CURSES_ATTRIBUTES.key?(key) && value == :set
+          end.map do |key, _value|
+            CURSES_ATTRIBUTES[key]
+          end.reduce(0, :|)
+        )
+        # @todo set color
       end
     end
   end

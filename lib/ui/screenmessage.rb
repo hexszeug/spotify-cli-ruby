@@ -41,9 +41,6 @@ module UI
       @lines = markup.split(/\n|\r\n/).map do |line|
         Markup.parse(line)
       end
-      @lines.each do |line| # @todo remove debug
-        puts line.to_s
-      end
       nil
     end
 
@@ -99,8 +96,8 @@ if caller.empty?
   require 'curses'
   require_relative 'markup'
 
+  Curses.init_screen
   UI::Markup::Colors.start
-  Curses.close_screen
 
   sm = UI::ScreenMessage.new <<~TEXT
     $0ALorem ipsum $*dolor$* sit amet, $_consetetur$_ sadipscing elitr,
@@ -109,10 +106,9 @@ if caller.empty?
     - Julien $rfBam
   TEXT
 
-  10.times do |i|
-    puts '-----------------'
-    sm.lines((i * 2) + 5).each do |line|
-      puts line.inspect
-    end
-  end
+  UI::Markup.print_lines(Curses.stdscr, sm.lines(Curses.cols))
+
+  Curses.getch
+
+  Curses.close_screen
 end
