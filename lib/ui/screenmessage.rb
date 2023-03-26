@@ -24,8 +24,7 @@ module UI
     #
     # @return [Array] of [Array] of [String|Hash] (hashes are markup tokens)
     def lines(max_length)
-      # @todo finde more readyble solution than flatten(1)
-      @lines.map { |line| line_break(line, max_length) }.flatten(1)
+      @lines.collect_concat { |line| line_break(line, max_length) }
     end
 
     private
@@ -98,10 +97,9 @@ end
 # @todo remove debug script
 if caller.empty?
   require 'curses'
-  require_relative 'colors'
   require_relative 'markup'
 
-  UI::Colors.start
+  UI::Markup::Colors.start
   Curses.close_screen
 
   sm = UI::ScreenMessage.new <<~TEXT

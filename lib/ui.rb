@@ -42,7 +42,7 @@ module UI
       Curses.nl
 
       # start colors
-      Colors.start
+      Markup::Colors.start
 
       # initialize io
       @input = Input.new
@@ -67,7 +67,7 @@ module UI
       end
     ensure
       # stop colors
-      Colors.stop
+      Markup::Colors.stop
 
       # stop curses
       Curses.close_screen
@@ -146,7 +146,7 @@ module UI
   end
 end
 
-require_relative 'ui/colors'
+require_relative 'ui/markup'
 require_relative 'ui/screenmessage'
 require_relative 'ui/input'
 require_relative 'ui/output'
