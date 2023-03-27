@@ -4,7 +4,7 @@ module Main
   module DefCmd
     class Account
       include Command
-      include Utils
+      include PrintUtils
 
       def initialize(dispatcher)
         dispatcher.register(
@@ -46,94 +46,103 @@ module Main
       private
 
       def info
+        print[:info] = <<~TEXT
+          Fetching user info.$~.
+        TEXT
         Spotify::API::Users.get_current_users_profile do |user|
-          UI.print_raw <<~TEXT
+          print[:info] += <<~TEXT
             You are currently logged in as:
-            #{explain_user(user)}
           TEXT
+          print(user, type: User)
         end.error do |e|
-          UI.print_raw explain_error(e)
+          error(e)
         end
       end
 
       def load
         Spotify::Auth::Token.load
-        UI.print_raw <<~TEXT
+        print(<<~TEXT)
           Loaded login data. Type `me` to see your account info.
-          (You do not need to do this manually. Data is loaded every time you start the program.)
+          $%(You do not need to do this manually. Data is loaded every time you start the program.)$%
         TEXT
       rescue Spotify::Auth::Token::NoTokenError,
              Spotify::Auth::Token::TokenParseError => e
-        UI.print_raw explain_error(e)
+        error(e)
       end
 
       def save
         Spotify::Auth::Token.save
-        UI.print_raw <<~TEXT
+        print(<<~TEXT)
           Saved login data.
-          (You do not need to do this manually. Data is saved every time you quit the program.)
+          $%(You do not need to do this manually. Data is saved every time you quit the program.)$%
         TEXT
       rescue Spotify::Auth::Token::NoTokenError => e
-        UI.print_raw explain_error(e)
+        error(e)
       end
 
       def refresh
+        print[:refresh] = <<~TEXT
+          Refreshing token.$~.
+        TEXT
         Spotify::Auth::Token.refresh do
-          UI.print_raw <<~TEXT
+          print[:refresh] += <<~TEXT
             Refreshed token.
           TEXT
         end.error do |e|
-          UI.print_raw explain_error(e)
+          error(e)
         end
       end
 
       def login(force: false)
         cancel_login if force && @login
         if @login
-          UI.print_raw <<~TEXT
+          print(<<~TEXT)
             You are already loggin in.
             Type `login cancel` if you want to cancel the login process or `login force` if you want to cancel and restart the login.
           TEXT
           return
         end
         if !force && Spotify::Auth::Token.get
-          UI.print_raw <<~TEXT
+          print(<<~TEXT)
             You are already logged in.
             Type `login force` if you want to logout the current account and login a new one.
           TEXT
           return
         end
 
-        UI.print_raw <<~TEXT
-          Login started. A browser window should pop up.
+        print(<<~TEXT)
+          Login started.
+        TEXT
+        print[:login] = <<~TEXT
+          A browser window should pop up.
         TEXT
         @login = Spotify::Auth.login do
           @login = nil
-          UI.print_raw <<~TEXT
+          print[:login] += <<~TEXT
             You successfully logged in.
           TEXT
         end.error do |e|
-          UI.print_raw(explain_error(e))
+          error(e)
         end
       end
 
       def cancel_login
         unless @login
-          UI.print_raw <<~TEXT
+          print(<<~TEXT)
             You are not logging in. There is nothing to cancel.
           TEXT
           return
         end
         @login.cancel
         @login = nil
-        UI.print_raw <<~TEXT
+        print[:login] += <<~TEXT
           Canceled login.
         TEXT
       end
 
       def logout
         Spotify::Auth::Token.set(nil)
-        UI.print_raw <<~TEXT
+        print(<<~TEXT)
           Successfully logged out.
         TEXT
       end

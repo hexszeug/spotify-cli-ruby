@@ -7,6 +7,7 @@ require_relative 'spotify'
 require_relative 'command'
 require_relative 'ui'
 
+require_relative 'main/print_utils'
 require_relative 'main/def_cmd'
 
 Spotify::Auth::Token.load(save: true)
