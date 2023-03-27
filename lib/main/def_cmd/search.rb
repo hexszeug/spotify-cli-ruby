@@ -4,7 +4,8 @@ module Main
   module DefCmd
     class Search
       include Command
-      include Utils
+      include PrintUtils
+      # @todo implement useful search (not 1000 results etc.)
 
       def initialize(dispatcher)
         dispatcher.register(
@@ -19,22 +20,25 @@ module Main
       private
 
       def search(q, type: %i[track artist])
+        print[:search] = <<~TEXT
+          Searching for '#{q}'.$~.
+        TEXT
         Spotify::API::Search.search_for_item(
           q:, type:, pagination: Spotify::API::Pagination.new
         ) do |page|
-          UI.print_raw <<~TEXT
-            Serach results:
+          print[:search] += <<~TEXT
+            $*$_Serach results for '#{q}':$*$_
             #{
               page.keys.map do |key|
                 <<~TYPE
-                  #{key.capitalize}:
+                  $*#{key.capitalize}:$*
                   #{page[key][:items].map { |v| v[:name] }.join(' * ')}
                 TYPE
               end.join("\n")
             }
           TEXT
         end.error do |e|
-          UI.print_raw explain_error(e)
+          error(e)
         end
       end
     end
