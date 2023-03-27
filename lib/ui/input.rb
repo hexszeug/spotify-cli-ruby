@@ -26,12 +26,9 @@ module UI
 
     def resize
       UI.resize_window(@win, 1, -2, -1, -2)
-      size = @win.maxx - 1
-      return if size == @display_size
-
       @changed = true
       prev_size = @display_size
-      @display_size = size
+      @display_size = @win.maxx - 1
       if @display_cursor >= @display_size
         @display_cursor = @display_size - 1
       elsif @cursor == @string.length && @display_cursor == prev_size - 1
@@ -49,10 +46,10 @@ module UI
       @changed = false
       s = @cursor - @display_cursor
       e = s + @display_size
-      @win.deleteln
-      @win.setpos 0, 0
+      @win.setpos(0, 0)
+      @win.clrtoeol
       @win.addstr @string[s...e]
-      @win.setpos 0, @display_cursor
+      @win.setpos(0, @display_cursor)
 
       @win.refresh
     end

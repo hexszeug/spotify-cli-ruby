@@ -21,13 +21,9 @@ module UI
 
     def resize
       UI.resize_window(@win, 1, 1, -1, -4)
-      h = @win.maxy
-      w = @win.maxx - 1
-      return if @height == h && @width == w
-
       @changed_size = true
-      @height = h
-      @width = w
+      @height = @win.maxy
+      @width = @win.maxx - 1
     end
 
     def refresh(force: false)
@@ -41,16 +37,21 @@ module UI
       end
       if first_change && first_change <= @first_undisplayed_message
         generate_least_as_possible(first_change, force)
-        @win.clear if force
         print_display
       elsif @scroll != @old_scroll
-        if @scroll > @old_scroll
+        amount = @old_scroll - @scroll
+        if amount.negative?
           generate_least_as_possible(@first_undisplayed_message, true)
-          return if @scroll == @old_scroll
+          amount = @old_scroll - @scroll
+          return if amount.zero?
         end
 
-        # @todo use curses scroll abilty
-        print_display
+        @win.scrl(amount)
+        if amount.positive?
+          print_display(@height - amount, 0)
+        else
+          print_display(0, @height + amount)
+        end
       else
         return
       end
@@ -112,9 +113,9 @@ module UI
         @display[@first_displayed_message...@first_undisplayed_message].reverse
 
       # clear screen
-      top_padding.upto(@height - bottom_padding) do |y|
+      (top_padding...(@height - bottom_padding)).each do |y|
         @win.setpos(y, 0)
-        @win.deleteln
+        @win.clrtoeol
       end
 
       # write to screen
@@ -125,7 +126,7 @@ module UI
         start = [top_padding - y, 0].max
         stop = @height - bottom_padding - y
         if start < lines.length && stop.positive?
-          @win.setpos(y.clamp(0, @height - 1), 0)
+          @win.setpos(y + start, 0)
           Markup.print_lines(@win, lines, start...stop)
         end
         y += lines.length
