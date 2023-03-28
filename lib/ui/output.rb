@@ -94,6 +94,7 @@ module UI
     end
 
     def print_display(top_padding = 0, bottom_padding = 0)
+      # @todo fix glitches with scrolling
       # fetch messages
       lines_before = 0
       lines_in = 0

@@ -20,7 +20,7 @@ module Main
         def generate_markup(max_length)
           # @todo display results in table
           markup = <<~TEXT
-            Searched #{@type} for '#{@q}'
+            $*Searched #{@type} for '#{@q}'$*
             #{@items.map { |v| "#{v[:name]} $%(#{Context.hook(v[:uri], self)})$%" }.join(' * ')}
           TEXT
           # @todo remove redundant markup parsing (when fixed in ScreenMessage)
