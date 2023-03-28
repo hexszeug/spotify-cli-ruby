@@ -4,7 +4,7 @@ module Main
   module DefCmd
     class TopItems
       include Command
-      include PrintUtils
+      include UI::PrintUtils
 
       def initialize(dispatcher)
         dispatcher.register(
@@ -35,7 +35,7 @@ module Main
             #{page[:items].map { |v| v[:name] }.join("\n")}
           TEXT
         end.error do |e|
-          error(e)
+          print(e, type: Display::Error)
         end
       end
     end

@@ -4,7 +4,7 @@ module Main
   module DefCmd
     class Account
       include Command
-      include PrintUtils
+      include UI::PrintUtils
 
       def initialize(dispatcher)
         dispatcher.register(
@@ -53,9 +53,9 @@ module Main
           print[:info] += <<~TEXT
             You are currently logged in as:
           TEXT
-          print(user, type: User)
+          print(user, type: Display::Entities::UserDetails)
         end.error do |e|
-          error(e)
+          print(e, type: Display::Error)
         end
       end
 
@@ -67,7 +67,7 @@ module Main
         TEXT
       rescue Spotify::Auth::Token::NoTokenError,
              Spotify::Auth::Token::TokenParseError => e
-        error(e)
+        print(e, type: Display::Error)
       end
 
       def save
@@ -77,7 +77,7 @@ module Main
           $%(You do not need to do this manually. Data is saved every time you quit the program.)$%
         TEXT
       rescue Spotify::Auth::Token::NoTokenError => e
-        error(e)
+        print(e, type: Display::Error)
       end
 
       def refresh
@@ -89,7 +89,7 @@ module Main
             Refreshed token.
           TEXT
         end.error do |e|
-          error(e)
+          print(e, type: Display::Error)
         end
       end
 
@@ -122,7 +122,7 @@ module Main
             You successfully logged in.
           TEXT
         end.error do |e|
-          error(e)
+          print(e, type: Display::Error)
         end
       end
 

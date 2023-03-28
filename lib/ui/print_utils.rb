@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Main
+module UI
   module PrintUtils
     # @todo print[]+= creates, print[]-= removes and print[]= updates
     def print(content = nil, type: UI::ScreenMessage)
@@ -10,11 +10,6 @@ module Main
       end
 
       @print ||= Printer.new
-    end
-
-    def error(error)
-      # @todo somehow delete waiting messages which got canceled by this error
-      print(error, type: Error)
     end
 
     class Printer
@@ -40,6 +35,3 @@ module Main
     private_constant :Printer
   end
 end
-
-require_relative 'print_utils/user'
-require_relative 'print_utils/error'

@@ -4,7 +4,7 @@ module Main
   module DefCmd
     class Search
       include Command
-      include PrintUtils
+      include UI::PrintUtils
       # @todo implement useful search (not 1000 results etc.)
 
       def initialize(dispatcher)
@@ -38,7 +38,7 @@ module Main
             }
           TEXT
         end.error do |e|
-          error(e)
+          print(e, type: Display::Error)
         end
       end
     end
