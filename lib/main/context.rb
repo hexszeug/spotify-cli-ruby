@@ -2,13 +2,12 @@
 
 module Main
   module Context
+    @pools = Hash.new do |hash, key|
+      hash[key] = []
+    end
+    @indices = {}
+    @hooks = {}
     class << self
-      @pools = Hash.new do |hash, key|
-        hash[key] = []
-      end
-      @indices = {}
-      @hooks = {}
-
       def lookup(id, pool_id = :track)
         return nil unless id.positive?
 
@@ -29,7 +28,7 @@ module Main
       end
 
       def hook(uri, hook)
-        return unless hook.responds_to?(:context_updated)
+        return unless hook.respond_to?(:context_updated)
 
         @hooks[hook] = uri
         @indices[uri] + 1
