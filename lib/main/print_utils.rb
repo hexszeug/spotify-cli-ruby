@@ -2,6 +2,7 @@
 
 module Main
   module PrintUtils
+    # @todo print[]+= creates, print[]-= removes and print[]= updates
     def print(content = nil, type: UI::ScreenMessage)
       if !content.nil? && type <= UI::ScreenMessage
         UI.print(type.new(content))
