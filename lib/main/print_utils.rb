@@ -13,6 +13,7 @@ module Main
     end
 
     def error(error)
+      # @todo somehow delete waiting messages which got canceled by this error
       print(error, type: Error)
     end
 
