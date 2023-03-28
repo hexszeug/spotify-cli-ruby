@@ -4,7 +4,7 @@ module Main
   module DefCmd
     class TopItems
       include Command
-      include Utils
+      include PrintUtils
 
       def initialize(dispatcher)
         dispatcher.register(
@@ -23,16 +23,19 @@ module Main
       private
 
       def top_items(type)
+        print[type] = <<~TEXT
+          Fetching top #{type}.$~.
+        TEXT
         Spotify::API::Users.get_users_top_items(
           type:,
           pagination: Spotify::API::Pagination.new
         ) do |page|
-          UI.print_raw <<~TEXT
-            Your top #{type}
+          print[type] += <<~TEXT
+            $*Your top #{type}$*
             #{page[:items].map { |v| v[:name] }.join("\n")}
           TEXT
         end.error do |e|
-          UI.print_raw explain_error(e)
+          error(e)
         end
       end
     end

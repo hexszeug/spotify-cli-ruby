@@ -29,8 +29,6 @@ module Main
   end
 end
 
-require_relative 'def_cmd/utils'
-
 require_relative 'def_cmd/exit'
 require_relative 'def_cmd/echo'
 require_relative 'def_cmd/account'
