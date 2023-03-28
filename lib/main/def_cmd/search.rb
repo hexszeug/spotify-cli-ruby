@@ -28,15 +28,15 @@ module Main
         ) do |page|
           print[:search] += <<~TEXT
             $*$_Serach results for '#{q}':$*$_
-            #{
-              page.keys.map do |key|
-                <<~TYPE
-                  $*#{key.capitalize}:$*
-                  #{page[key][:items].map { |v| v[:name] }.join(' * ')}
-                TYPE
-              end.join("\n")
-            }
           TEXT
+          page.each do |key, value|
+            search_obj = {
+              q:,
+              type: key,
+              items: value[:items]
+            }
+            print(search_obj, type: Display::Entities::SearchResults)
+          end
         end.error do |e|
           print(e, type: Display::Error)
         end

@@ -8,3 +8,4 @@ module Main
 end
 
 require_relative 'entities/user_details'
+require_relative 'entities/search_results'
