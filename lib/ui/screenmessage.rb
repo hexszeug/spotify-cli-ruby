@@ -2,7 +2,7 @@
 
 module UI
   class ScreenMessage
-    # @todo (bugfix) move generation of markup lines from read_content to lines
+    # @todo (logic bug) move generation of markup lines from read_content to lines
     def initialize(markup)
       update(markup)
     end

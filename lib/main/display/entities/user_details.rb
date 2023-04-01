@@ -4,7 +4,7 @@ module Main
   module Display
     module Entities
       class UserDetails < UI::ScreenMessage
-        # @todo (bugfix) move generation of markup into generate_markup
+        # @todo (logic bug) move generation of markup into generate_markup
         def initialize(user)
           Context.register([user[:uri]])
           super(user)
