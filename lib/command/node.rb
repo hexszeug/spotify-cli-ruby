@@ -34,6 +34,8 @@ module Command
       @suggester = nil
     end
 
+    # @todo implement comparison function, use it for building and dispatching
+
     ##
     # *to be overridden*
     #

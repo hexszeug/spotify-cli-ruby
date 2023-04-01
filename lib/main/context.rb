@@ -8,7 +8,7 @@ module Main
     @indices = {}
     @hooks = {}
     class << self
-      def lookup(id, pool_id = :track)
+      def lookup(id, pool_id = 'track')
         return nil unless id.positive?
 
         @pools[pool_id][id - 1]
@@ -59,3 +59,5 @@ module Main
     end
   end
 end
+
+require_relative 'context/uri_argument'
