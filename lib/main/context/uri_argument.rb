@@ -3,6 +3,9 @@
 module Main
   module Context
     class URIArgument < Command::Node
+      # @todo replace allow_mixed_contexts context_with_offset (or better name)
+      # @todo return list of uris unless context_with_offset is set
+
       TYPES = %i[
         track
         artist

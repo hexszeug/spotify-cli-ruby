@@ -3,6 +3,7 @@
 module UI
   class ScreenMessage
     # @todo (logic bug) move generation of markup lines from read_content to lines
+    # @todo use decorator pattern instead of inheritance for custom generation
     def initialize(markup)
       update(markup)
     end

@@ -5,6 +5,7 @@ module Main
     class Play
       # @todo play albums, playlist, artists, etc.
       # @todo play track in context
+      # @todo set device if non is selected by default by spotify
       include Command
       include UI::PrintUtils
 
