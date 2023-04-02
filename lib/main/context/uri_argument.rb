@@ -24,7 +24,7 @@ module Main
         allow_mixed_types: false,
         allow_mixed_contexts: true
       )
-        super(name, :argument)
+        super(:argument, name)
         @default_type = default_type.to_s
         @allow_types = allow_types.map(&:to_s)
         @allow_mixed_types = allow_mixed_types
@@ -38,15 +38,16 @@ module Main
           if (reference = str.match(REFERENCE_REGEXP))
             type = reference[:type] || @default_type
 
-            if (id = reference[:id].to_i)
-              valid_literal?(Context.lookup(id, type), types, contexts)
-            else
+            if reference[:id].nil?
               range = (reference[:from].to_i)..(reference[:to].to_i)
 
               range.size.positive? &&
                 range.all? do |i|
                   valid_literal?(Context.lookup(i, type), types, contexts)
                 end
+            else
+              id = reference[:id].to_i
+              valid_literal?(Context.lookup(id, type), types, contexts)
             end
           else
             valid_literal?(str, types, contexts)
@@ -59,12 +60,13 @@ module Main
         token.split(',').each do |str|
           if (reference = str.match(REFERENCE_REGEXP))
             type = reference[:type] || @default_type
-            if (id = reference[:id].to_i)
-              uris.push(parse_literal(Context.lookup(id, type)))
-            else
+            if reference[:id].nil?
               reference[:from].to_i.upto(reference[:to].to_i) do |i|
                 uris.push(parse_literal(Context.lookup(i, type)))
               end
+            else
+              id = reference[:id].to_i
+              uris.push(parse_literal(Context.lookup(id, type)))
             end
           else
             uris.push(parse_literal(str))

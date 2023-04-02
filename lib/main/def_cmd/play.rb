@@ -3,28 +3,39 @@
 module Main
   module DefCmd
     class Play
+      # @todo play albums, playlist, artists, etc.
+      # @todo play track in context
       include Command
       include UI::PrintUtils
 
       def initialize(dispatcher)
         dispatcher.register(
-          literal('play').then(
+          literal('play').executes do
+            resume
+          end.then(
             Context::URIArgument.new(
               :uris,
               allow_mixed_types: [:track],
               allow_mixed_contexts: false
             ).executes do |ctx|
-              play(ctx[:uris])
+              play_tracks(ctx[:uris])
             end
           )
         )
       end
-    end
 
-    private
+      private
 
-    def play(uris)
-      # @todo implement (and test uri_argument with it)
+      def resume; end
+
+      def play_tracks(uri_objs)
+        uris = uri_objs.map { |uri| uri[:uri] }
+        Spotify::API::Player.start_resume_playback(uris:) do
+          print('@todo print playback state')
+        end.error do |e|
+          print(e, type: Display::Error)
+        end
+      end
     end
   end
 end

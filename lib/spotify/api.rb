@@ -178,6 +178,8 @@ module Spotify
             end
 
             async_request(args, promise:, retries: retries - 1)
+          rescue Error => e
+            promise.fail(e)
           else
             promise.resolve(res)
           end.error do |request_error|
@@ -191,7 +193,7 @@ module Spotify
         case (code = res.code)
         when '200', '201', '202', '204' then data
         when /^[45]/
-          raise BadResponse(res.code) unless data && Error::CODES.key?(code)
+          raise BadResponse(code) unless data && Error::CODES.key?(code)
 
           if Error::CODES[code] == TooManyRequests
             raise(
@@ -206,6 +208,8 @@ module Spotify
       end
 
       def read_body(body)
+        return if body.nil?
+
         begin
           body = JSON.parse(body, symbolize_names: true)
         rescue JSON::JSONError
