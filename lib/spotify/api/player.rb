@@ -71,9 +71,9 @@ module Spotify
           &
         )
           query = device_id.nil? ? {} : { device_id: }
-          if context_uri.nil?
+          if !uris.nil?
             body = { uris: }
-          else
+          elsif !context_uri.nil?
             body = { context_uri: }
             unless offset_position.nil?
               body[:offset] = { position: offset_position }

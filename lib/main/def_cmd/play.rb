@@ -3,7 +3,6 @@
 module Main
   module DefCmd
     class Play
-      # @todo play albums, playlist, artists, etc.
       # @todo play track in context
       # @todo set device if non is selected by default by spotify
       include Command
@@ -16,14 +15,14 @@ module Main
           end.then(
             Context::URIArgument.new(
               :uris,
-              allow_types: [:track]
+              allow_types: %i[track episode]
             ).executes do |ctx|
               play_tracks(ctx[:uris])
             end
           ).then(
             Context::URIArgument.new(
               :ctx_uris,
-              allow_types: %i[artist album playlist]
+              allow_types: %i[artist album playlist show]
             ).executes do |ctx|
               play_context(ctx[:ctx_uris][0])
             end
@@ -33,7 +32,13 @@ module Main
 
       private
 
-      def resume; end
+      def resume
+        Spotify::API::Player.start_resume_playback do
+          print('@todo print playback state')
+        end.error do |e|
+          print(e, type: Display::Error)
+        end
+      end
 
       def play_tracks(uris)
         Spotify::API::Player.start_resume_playback(uris:) do
