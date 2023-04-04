@@ -15,16 +15,26 @@ module Main
           end.then(
             Context::URIArgument.new(
               :uris,
-              allow_types: %i[track episode]
+              allow_types: %i[track episode],
+              allow_mixed_types: false
             ).executes do |ctx|
               play_tracks(ctx[:uris])
             end
           ).then(
             Context::URIArgument.new(
-              :ctx_uris,
+              :context_uri,
+              allow_types: %i[track episode],
+              single_uri_with_context: true
+            ).executes do |ctx|
+              context = ctx[:context_uri]
+              play_context(context[:context], context[:uri])
+            end
+          ).then(
+            Context::URIArgument.new(
+              :contexts,
               allow_types: %i[artist album playlist show]
             ).executes do |ctx|
-              play_context(ctx[:ctx_uris][0])
+              play_context(ctx[:contexts][0])
             end
           )
         )
@@ -48,9 +58,16 @@ module Main
         end
       end
 
-      def play_context(context_uri, _offset = nil)
-        # @todo implement offset
-        Spotify::API::Player.start_resume_playback(context_uri:) do
+      def play_context(context_uri, offset = nil)
+        unless offset.nil?
+          offset_uri = offset if offset.is_a?(String)
+          offset_position = offset if offset.is_a?(Integer)
+        end
+        Spotify::API::Player.start_resume_playback(
+          context_uri:,
+          offset_position:,
+          offset_uri:
+        ) do
           print('@todo print playback state')
         end.error do |e|
           print(e, type: Display::Error)

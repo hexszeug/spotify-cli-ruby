@@ -63,11 +63,12 @@ module Spotify
         #   (only if context uri provided)
         # @param device_id [device/id] *(optional)*
         def start_resume_playback(
+          device_id: nil,
           uris: nil,
           context_uri: nil,
           offset_position: nil,
           offset_uri: nil,
-          device_id: nil,
+          position_ms: nil,
           &
         )
           query = device_id.nil? ? {} : { device_id: }
@@ -79,7 +80,10 @@ module Spotify
               body[:offset] = { position: offset_position }
             end
             body[:offset] = { uri: offset_uri } unless offset_uri.nil?
+          else
+            body = {}
           end
+          body.update(position_ms:) unless position_ms.nil?
           API.request('/me/player/play', :put, query:, body:, &)
         end
 

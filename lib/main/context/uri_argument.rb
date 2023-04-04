@@ -70,7 +70,7 @@ module Main
             uris.push(parse_literal(str))
           end
         end
-        uris
+        @single_uri_with_context ? uris.first : uris
       end
 
       private
