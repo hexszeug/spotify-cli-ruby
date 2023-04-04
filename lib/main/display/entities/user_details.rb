@@ -3,22 +3,21 @@
 module Main
   module Display
     module Entities
-      class UserDetails < UI::ScreenMessage
+      class UserDetails
         # @todo (logic bug) move generation of markup into generate_markup
-        def initialize(user)
-          Context.register([user[:uri]])
-          super(user)
+        def initialize(screen_message)
+          @screen_message = screen_message
+          Context.register([screen_message.content[:uri]])
         end
 
         def context_updated
-          @changed = true
+          @screen_message.touch
         end
 
-        private
-
-        def update_content(user)
+        def generate(_max_width)
           # @todo adjust display text for strange users
-          super(<<~TEXT)
+          user = @screen_message.content
+          <<~TEXT
             $*#{user[:display_name]}$* $%(#{Context.hook(user[:uri], self)})$%
             $_#{user[:email]}$_ $Y#{user[:product]}$0c
             Followers: #{user[:followers][:total]}

@@ -2,13 +2,16 @@
 
 module Main
   module Display
-    class Error < UI::ScreenMessage
-      private
-
-      def update_content(error)
+    class Error
+      def initialize(screen_message)
         # @todo not here somehow delete loading msgs that got crashed by error
+        @screen_message = screen_message
+      end
+
+      def generate(_width)
         # @todo explain Spotify::SpotifyError subclasses
-        super(<<~TEXT)
+        error = @screen_message.content
+        <<~TEXT
           $r#{error.full_message.gsub(/\e\[[;\d]*m/, '')}
         TEXT
       end

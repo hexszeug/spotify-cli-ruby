@@ -2,10 +2,10 @@
 
 module UI
   module PrintUtils
-    # @todo print[]+= creates, print[]-= removes and print[]= updates
-    def print(content = nil, type: UI::ScreenMessage)
-      if !content.nil? && type <= UI::ScreenMessage
-        UI.print(type.new(content))
+    # @todo print[]+= creates, print[]-= removes and print[]= updates (or even more logical syntax)
+    def print(content = nil, type: nil)
+      unless content.nil?
+        UI.print(ScreenMessage.new(content, type:))
         return
       end
 
@@ -21,9 +21,9 @@ module UI
         @prints[key]
       end
 
-      def []=(key, content, type: UI::ScreenMessage)
-        if content.is_a?(String) && type <= UI::ScreenMessage
-          content = type.new(content)
+      def []=(key, content, type: nil)
+        if content.is_a?(String)
+          content = ScreenMessage.new(content, type:)
           class << content
             alias_method :+, :update
           end

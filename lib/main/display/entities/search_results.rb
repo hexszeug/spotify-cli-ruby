@@ -3,30 +3,24 @@
 module Main
   module Display
     module Entities
-      class SearchResults < UI::ScreenMessage
+      class SearchResults
+        def initialize(screen_message)
+          @screen_message = screen_message
+          search = @screen_message.content
+          Context.register(search[:items].map { |item| item[:uri] })
+        end
+
         def context_updated
-          @changed = true
+          @screen_message.touch
         end
 
-        private
-
-        def update_content(search)
-          @q = search[:q]
-          @type = search[:type]
-          @items = search[:items]
-          Context.register(@items.map { |item| item[:uri] })
-        end
-
-        def generate_markup(max_length)
+        def generate(_max_length)
           # @todo display results in table
-          markup = <<~TEXT
-            $*Searched #{@type} for '#{@q}'$*
-            #{@items.map { |v| "#{v[:name]} $%(#{Context.hook(v[:uri], self)})$%" }.join(' * ')}
+          search = @screen_message.content
+          <<~TEXT
+            $*Searched #{search[:type]} for '#{search[:q]}'$*
+            #{search[:items].map { |v| "#{v[:name]} $%(#{Context.hook(v[:uri], self)})$%" }.join(' * ')}
           TEXT
-          # @todo remove redundant markup parsing (when fixed in ScreenMessage)
-          markup.split(/\r\n|\n/).flat_map do |line|
-            line_break(UI::Markup.parse(line), max_length)
-          end
         end
       end
     end

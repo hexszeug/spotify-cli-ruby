@@ -3,52 +3,38 @@
 module UI
   class ScreenMessage
     # @todo (logic bug) move generation of markup lines from read_content to lines
-    # @todo use decorator pattern instead of inheritance for custom generation
-    def initialize(markup)
-      update(markup)
+    # @todo test integration of switch to decorator instaead of inheritance
+    attr_reader :content
+
+    def changed?
+      @changed
     end
 
-    def changed? = @changed
+    def initialize(content, type: nil)
+      update(content, type:)
+    end
 
-    ##
-    # Sets the new content of the message to `markup`.
-    # **Must not be overwritten!
-    # To change behavior of subclasses overwrite
-    # the private method `update_content`.**
-    #
-    def update(markup)
+    def touch
       @changed = true
-      update_content(markup)
+    end
+
+    def update(content, type: nil)
+      @changed = true
+      @content = content
+      @decorator = type&.new(self)
       self
     end
 
     ##
-    # Returns the lines in the message and inserts line breaks when needed.
-    # **Must not be overwritten!
-    # To change behavior of subclasses overwrite
-    # the private method `generate_markup`.**
-    #
-    # @param max_length [Integer]
-    #
     # @return [Array] of [Array] of [String|Hash] (hashes are markup tokens)
     def lines(max_length)
       @changed = false
-      generate_markup(max_length)
+      markup = @decorator&.generate(max_length) || @content
+      lines = parse_markup(markup)
+      crop_lines(lines, max_length)
     end
 
     private
-
-    ##
-    # Can be overwitten by subclasses for cutom behavior
-    def update_content(markup)
-      @lines = parse_markup(markup)
-    end
-
-    ##
-    # Can be overwitten by subclasses for cutom behavior
-    def generate_markup(max_length)
-      @lines.collect_concat { |line| line_break(line, max_length) }
-    end
 
     def parse_markup(markup)
       return [['']] if markup.empty?
@@ -56,6 +42,10 @@ module UI
       markup.split(/\n|\r\n/).map do |line|
         Markup.parse(line)
       end
+    end
+
+    def crop_lines(lines, max_length)
+      lines.collect_concat { |line| line_break(line, max_length) }
     end
 
     def line_break(long_line, max_length)

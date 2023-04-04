@@ -67,7 +67,7 @@ module UI
       return unless screen_message.is_a?(ScreenMessage)
 
       @screen_messages.unshift(screen_message)
-      @display.unshift([])
+      @display.unshift([]) # @todo this is kind of hacky, make it more reliable
     end
 
     def scroll(amount = 0)
