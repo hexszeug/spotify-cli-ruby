@@ -3,6 +3,7 @@
 module Main
   module Context
     class URIArgument < Command::Node
+      # @todo split single_uri_with_context into allow_multiple and with_context
       TYPES = %i[
         track
         artist
