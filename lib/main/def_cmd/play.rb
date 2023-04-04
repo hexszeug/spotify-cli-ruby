@@ -16,8 +16,7 @@ module Main
           end.then(
             Context::URIArgument.new(
               :uris,
-              allow_mixed_types: [:track],
-              allow_mixed_contexts: false
+              allow_mixed_types: [:track]
             ).executes do |ctx|
               play_tracks(ctx[:uris])
             end
@@ -29,8 +28,7 @@ module Main
 
       def resume; end
 
-      def play_tracks(uri_objs)
-        uris = uri_objs.map { |uri| uri[:uri] }
+      def play_tracks(uris)
         Spotify::API::Player.start_resume_playback(uris:) do
           print('@todo print playback state')
         end.error do |e|
