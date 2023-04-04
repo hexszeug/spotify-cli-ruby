@@ -17,6 +17,8 @@ module Main
       REFERENCE_REGEXP =
         %r{^(?:(?<type>\w+)[/:])?(?:(?<id>\d+)|(?<from>\d+)-(?<to>\d+))$}
 
+      attr_reader :allow_types, :single_uri_with_context
+
       def initialize(
         name,
         default_type: :track,
@@ -29,6 +31,16 @@ module Main
         @allow_types = allow_types.map(&:to_s)
         @allow_mixed_types = allow_mixed_types
         @single_uri_with_context = single_uri_with_context
+      end
+
+      def <=>(other)
+        return super(other) unless other.instance_of?(URIArgument)
+
+        if @single_uri_with_context == other.single_uri_with_context
+          0 unless @allow_types.instersection(other.allow_types).empty?
+        else
+          @single_uri_with_context ? -1 : 1
+        end
       end
 
       def valid?(token)

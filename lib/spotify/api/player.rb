@@ -65,13 +65,21 @@ module Spotify
         def start_resume_playback(
           uris: nil,
           context_uri: nil,
-          offset: 0,
+          offset_position: nil,
+          offset_uri: nil,
           device_id: nil,
           &
         )
           query = device_id.nil? ? {} : { device_id: }
-          body = { context_uri:, offset: } unless context_uri.nil?
-          body = { uris: } unless uris.nil?
+          if context_uri.nil?
+            body = { uris: }
+          else
+            body = { context_uri: }
+            unless offset_position.nil?
+              body[:offset] = { position: offset_position }
+            end
+            body[:offset] = { uri: offset_uri } unless offset_uri.nil?
+          end
           API.request('/me/player/play', :put, query:, body:, &)
         end
 

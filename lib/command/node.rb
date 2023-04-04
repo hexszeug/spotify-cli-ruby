@@ -2,6 +2,8 @@
 
 module Command
   class Node
+    include Comparable
+
     attr_reader :type, :name
 
     def initialize(type, name)
@@ -34,7 +36,16 @@ module Command
       @suggester = nil
     end
 
-    # @todo implement comparison function, use it for building and dispatching
+    ##
+    # *to be overridden*
+    #
+    # *IMPORTANT: overridden method must call super if other is
+    # of a different class keep <=> symmetrical*
+    def <=>(other)
+      return -(other <=> self) if other.is_a?(Arguments::GreedyString)
+
+      self.class <=> other.class
+    end
 
     ##
     # *to be overridden*
@@ -102,7 +113,7 @@ module Command
         @argument_children
         .values
         .filter { |a| a.valid? token }
-        .min { |a, b| a.class <=> b.class }
+        .min
       if arg
         arg.dispatch(context)
         return
@@ -184,9 +195,7 @@ module Command
             @argument_children[node.name]
           )
         end
-        @argument_children.each_value do |arg|
-          next unless arg.instance_of? node.class
-
+        if @argument_children.any? { |arg| arg == node }
           raise BuildingError.new(
             :indistinguishable_arguments,
             self,
@@ -202,6 +211,7 @@ module Command
     ##
     # @return [Node] self
     def suggests(&block)
+      # @todo remove @suggester if unused
       @suggester = block
       self
     end
