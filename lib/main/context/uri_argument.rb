@@ -11,6 +11,7 @@ module Main
         show
         episode
         audiobook
+        user
       ].freeze
       LITERAL_REGEXP =
         %r{^(?:(?<context>.*)/)?(?<uri>(?:\w+:)*(?<type>\w+):\w+)$}
