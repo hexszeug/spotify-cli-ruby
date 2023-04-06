@@ -211,7 +211,6 @@ module Command
     ##
     # @return [Node] self
     def suggests(&block)
-      # @todo remove @suggester if unused
       @suggester = block
       self
     end
