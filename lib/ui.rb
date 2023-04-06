@@ -52,8 +52,8 @@ module UI
       resize
 
       # loop
+      @running = true
       begin
-        @running = true
         while @running
           @input.read
           @output.refresh
@@ -61,7 +61,7 @@ module UI
         end
       rescue Exception => e # rubocop:disable Lint/RescueException
         Curses.close_screen
-        retry if @error_listener&.call(e)
+        retry if @crash_handler&.call(e)
 
         raise
       end
@@ -93,8 +93,16 @@ module UI
       @suggestion_provider = block
     end
 
-    def errors(&block)
-      @error_listener = block
+    ##
+    # Passed block is called if a thread crashes due to an exception
+    # while the main ui loop is running.
+    # The expection is passed to the block.
+    #
+    # If the block returns a truthy value the exception is ignored
+    # and the ui loop continues.
+    # Otherwise the ui shuts down and the exception is reraised.
+    def on_crash(&block)
+      @crash_handler = block
     end
 
     ##
