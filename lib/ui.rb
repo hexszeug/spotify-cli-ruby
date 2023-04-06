@@ -81,10 +81,6 @@ module UI
       @running = false
     end
 
-    def print_raw(str)
-      @output&.print(ScreenMessage.new(str))
-    end
-
     def print(screen_message)
       @output&.print(screen_message)
     end

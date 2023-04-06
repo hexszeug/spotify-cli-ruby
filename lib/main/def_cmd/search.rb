@@ -20,13 +20,13 @@ module Main
       private
 
       def search(q, type: %i[track artist])
-        print[:search] = <<~TEXT
+        screen_message = print <<~TEXT
           Searching for '#{q}'.$~.
         TEXT
         Spotify::API::Search.search_for_item(
           q:, type:, pagination: Spotify::API::Pagination.new
         ) do |page|
-          print[:search] += <<~TEXT
+          screen_message.replace(<<~TEXT)
             $*$_Serach results for '#{q}':$*$_
           TEXT
           page.each do |key, value|
@@ -35,10 +35,10 @@ module Main
               type: key,
               items: value[:items]
             }
-            print(search_obj, type: Display::Entities::SearchResults)
+            print search_obj, type: Display::Entities::SearchResults
           end
         end.error do |e|
-          print(e, type: Display::Error)
+          screen_message.replace(e, type: Display::Error)
         end
       end
     end

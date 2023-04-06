@@ -23,19 +23,19 @@ module Main
       private
 
       def top_items(type)
-        print[type] = <<~TEXT
+        screen_message = print <<~TEXT
           Fetching top #{type}.$~.
         TEXT
         Spotify::API::Users.get_users_top_items(
           type:,
           pagination: Spotify::API::Pagination.new
         ) do |page|
-          print[type] += <<~TEXT
+          screen_message.replace(<<~TEXT)
             $*Your top #{type}$*
             #{page[:items].map { |v| v[:name] }.join("\n")}
           TEXT
         end.error do |e|
-          print(e, type: Display::Error)
+          screen_message.replace(e, type: Display::Error)
         end
       end
     end

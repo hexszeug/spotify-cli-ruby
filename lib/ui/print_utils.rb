@@ -2,36 +2,46 @@
 
 module UI
   module PrintUtils
-    # @todo print[]+= creates, print[]-= removes and print[]= updates (or even more logical syntax)
+    private
+
     def print(content = nil, type: nil)
-      unless content.nil?
-        UI.print(ScreenMessage.new(content, type:))
-        return
+      @print ||= Print.new
+      if content.nil?
+        @print
+      else
+        @print.create(content, type:)
       end
-
-      @print ||= Printer.new
     end
 
-    class Printer
-      def initialize
-        @prints = {}
-      end
-
-      def [](key)
-        @prints[key]
-      end
-
-      def []=(key, content, type: nil)
-        if content.is_a?(String)
-          content = ScreenMessage.new(content, type:)
-          class << content
-            alias_method :+, :update
-          end
-          UI.print(content)
+    private_constant(
+      class Print
+        def initialize
+          @prints = {}
         end
-        @prints[key] = content if content.is_a?(UI::ScreenMessage)
+
+        def [](key)
+          @key = key
+          self
+        end
+
+        def replace(content, type: nil)
+          if @prints[@key].nil?
+            create(content, type:)
+          else
+            screen_message = @prints[@key]
+            screen_message.update(content, type:)
+            @key = nil
+            screen_message
+          end
+        end
+
+        def create(content, type: nil)
+          screen_message = ScreenMessage.new(content, type:)
+          @prints[@key] = screen_message
+          @key = nil
+          screen_message
+        end
       end
-    end
-    private_constant :Printer
+    )
   end
 end

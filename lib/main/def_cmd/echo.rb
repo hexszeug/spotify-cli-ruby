@@ -4,14 +4,15 @@ module Main
   module DefCmd
     class Echo
       include Command
+      include UI::PrintUtils
 
       def initialize(dispatcher)
         dispatcher.register(
           literal('echo').executes do
-            UI.print_raw('')
+            print ''
           end.then(
             Arguments::GreedyString.new(:str).executes do |ctx|
-              UI.print_raw(ctx[:str])
+              print ctx[:str]
             end
           )
         )

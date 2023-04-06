@@ -2,13 +2,14 @@
 
 module UI
   class ScreenMessage
-    attr_reader :content
+    attr_reader :content, :decorator
 
     def changed?
       @changed
     end
 
     def initialize(content, type: nil)
+      UI.print(self)
       update(content, type:)
     end
 
@@ -19,6 +20,7 @@ module UI
     def update(content, type: nil)
       @changed = true
       @content = content
+      @decorator&.delete
       @decorator = type&.new(self)
       self
     end

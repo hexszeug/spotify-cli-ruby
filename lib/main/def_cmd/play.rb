@@ -44,17 +44,17 @@ module Main
 
       def resume
         Spotify::API::Player.start_resume_playback do
-          print('@todo print playback state')
+          print '@todo print playback state'
         end.error do |e|
-          print(e, type: Display::Error)
+          print e, type: Display::Error
         end
       end
 
       def play_tracks(uris)
         Spotify::API::Player.start_resume_playback(uris:) do
-          print('@todo print playback state')
+          print '@todo print playback state'
         end.error do |e|
-          print(e, type: Display::Error)
+          print e, type: Display::Error
         end
       end
 
@@ -68,9 +68,9 @@ module Main
           offset_position:,
           offset_uri:
         ) do
-          print('@todo print playback state')
+          print '@todo print playback state'
         end.error do |e|
-          print(e, type: Display::Error)
+          print e, type: Display::Error
         end
       end
     end
