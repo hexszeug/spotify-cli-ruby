@@ -2,8 +2,6 @@
 
 module UI
   class ScreenMessage
-    # @todo (logic bug) move generation of markup lines from read_content to lines
-    # @todo test integration of switch to decorator instaead of inheritance
     attr_reader :content
 
     def changed?

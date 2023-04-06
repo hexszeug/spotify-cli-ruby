@@ -4,7 +4,6 @@ module Main
   module Display
     module Entities
       class UserDetails
-        # @todo (logic bug) move generation of markup into generate_markup
         def initialize(screen_message)
           @screen_message = screen_message
           Context.register([screen_message.content[:uri]])
