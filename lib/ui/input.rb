@@ -240,7 +240,7 @@ module UI
         @string.clear
         @history_pointer = @history.length - 1
         move_cursor 0
-        # @todo scroll output down
+        UI.output.scroll(0, absolute: true)
       else
         return false
       end

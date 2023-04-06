@@ -70,11 +70,10 @@ module UI
       @display.unshift([]) # @todo this is kind of hacky, make it more reliable
     end
 
-    def scroll(amount = 0)
+    def scroll(amount = 0, absolute: false)
       amount = yield @height if block_given?
-      return if amount.zero?
-
-      @scroll = [(@scroll - amount), 0].max
+      pos = absolute ? amount : @scroll - amount
+      @scroll = [pos, 0].max
     end
 
     private
