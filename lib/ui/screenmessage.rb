@@ -9,15 +9,15 @@ module UI
     end
 
     def initialize(content, type: nil)
+      replace(content, type:)
       UI.print(self)
-      update(content, type:)
     end
 
     def touch
       @changed = true
     end
 
-    def update(content, type: nil)
+    def replace(content, type: nil)
       @changed = true
       @content = content
       @decorator&.delete

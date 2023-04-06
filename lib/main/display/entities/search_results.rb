@@ -14,6 +14,10 @@ module Main
           @screen_message.touch
         end
 
+        def delete
+          Context.unhook(self)
+        end
+
         def generate(_max_length)
           # @todo display results in table
           search = @screen_message.content
