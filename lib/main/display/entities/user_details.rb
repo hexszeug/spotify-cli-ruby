@@ -13,6 +13,10 @@ module Main
           @screen_message.touch
         end
 
+        def delete
+          Context.unhook(self)
+        end
+
         def generate(_max_width)
           # @todo adjust display text for strange users
           user = @screen_message.content
