@@ -14,28 +14,40 @@ module Main
             resume
           end.then(
             Context::URIArgument.new(
-              :uris,
+              :tracks,
               allow_types: %i[track episode],
               allow_mixed_types: false
             ).executes do |ctx|
-              play_tracks(ctx[:uris])
+              play_tracks(ctx[:tracks])
             end
           ).then(
             Context::URIArgument.new(
-              :context_uri,
+              :track,
               allow_types: %i[track episode],
-              single_uri_with_context: true
+              allow_multiple: false,
+              with_context: true
             ).executes do |ctx|
-              context = ctx[:context_uri]
-              play_context(context[:context], context[:uri])
+              track = ctx[:track]
+              if track[:context].nil?
+                play_tracks([track[:uri]])
+              else
+                play_context(track[:context], track[:uri])
+              end
             end
           ).then(
             Context::URIArgument.new(
-              :contexts,
-              allow_types: %i[artist album playlist show]
+              :context,
+              allow_types: %i[artist album playlist show],
+              allow_multiple: false
             ).executes do |ctx|
-              play_context(ctx[:contexts][0])
-            end
+              play_context(ctx[:context])
+            end.then(
+              literal('at').then(
+                Arguments::Integer.new(:position).executes do |ctx|
+                  play_context(ctx[:context], ctx[:position] - 1)
+                end
+              )
+            )
           )
         )
       end

@@ -17,6 +17,7 @@ Main::DefCmd.create
 UI.returns { |str| Main::DefCmd.execute(str) }
 UI.suggests { |str| Main::DefCmd.suggest(str) }
 UI.errors do
+  # @todo better fatal error handling
   Spotify::Auth::Token.save
   false
 end

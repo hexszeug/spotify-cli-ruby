@@ -28,5 +28,19 @@ module Command
         context[@name] = parse(value.join(' '))
       end
     end
+
+    class Integer < Node
+      def initialize(name)
+        super(:argument, name)
+      end
+
+      def valid?(token)
+        token.match?(/^\d+$/)
+      end
+
+      def parse(token)
+        token.to_i
+      end
+    end
   end
 end

@@ -18,13 +18,13 @@ module Main
       def execute(str)
         @dispatcher.execute(str)
       rescue Command::CommandError => e
-        raise UI::Error, e.message
+        raise UI::Error, "$r#{e.message}"
       end
 
       def suggest(str)
         @dispatcher.suggest(str)
       rescue Command::CommandError => e
-        raise UI::Error, e.message
+        raise UI::Error, "$r#{e.message}"
       end
     end
   end

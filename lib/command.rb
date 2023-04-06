@@ -10,17 +10,12 @@ module Command
   ##
   # raised by [Dispatcher] #suggest and #execute
   class CommandError < StandardError
-    attr_reader :type, :context
+    attr_reader :type, :context, :message
 
     def initialize(type, context)
       super()
       @type = type
       @context = context
-    end
-
-    def message
-      return @message if @message
-
       @message =
         case type
         when :incorrect_arg
@@ -37,6 +32,8 @@ module Command
           @type
         end
     end
+
+    private
 
     def cmd_snippet(length, stop_node: nil)
       cmd = @context.cmd[..stop_node].join(' ')

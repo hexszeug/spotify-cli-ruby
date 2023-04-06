@@ -3,7 +3,6 @@
 module Main
   module Context
     class URIArgument < Command::Node
-      # @todo split single_uri_with_context into allow_multiple and with_context
       TYPES = %i[
         track
         artist
@@ -19,40 +18,53 @@ module Main
       REFERENCE_REGEXP =
         %r{^(?:(?<type>\w+)[/:])?(?:(?<id>\d+)|(?<from>\d+)-(?<to>\d+))$}
 
-      attr_reader :allow_types, :single_uri_with_context
+      attr_reader :allow_types,
+                  :allow_multiple,
+                  :allow_mixed_types,
+                  :with_context
 
       def initialize(
         name,
         default_type: :track,
         allow_types: TYPES,
-        allow_mixed_types: false,
-        single_uri_with_context: false
+        allow_multiple: true,
+        allow_mixed_types: true,
+        with_context: false
       )
         super(:argument, name)
         @default_type = default_type.to_s
         @allow_types = allow_types.map(&:to_s)
+        @allow_multiple = allow_multiple
         @allow_mixed_types = allow_mixed_types
-        @single_uri_with_context = single_uri_with_context
+        @with_context = with_context
       end
 
       def <=>(other)
         return super(other) unless other.instance_of?(URIArgument)
 
-        if @single_uri_with_context == other.single_uri_with_context
-          0 unless @allow_types.instersection(other.allow_types).empty?
+        return if @allow_types.intersection(other.allow_types).empty?
+
+        if @allow_multiple != other.allow_multiple
+          @allow_multiple ? 1 : -1
+        elsif @allow_mixed_types != other.allow_mixed_types
+          @allow_mixed_types ? 1 : -1
+        elsif @with_context != other.with_context
+          @with_context ? -1 : 1
         else
-          @single_uri_with_context ? -1 : 1
+          0
         end
       end
 
       def valid?(token)
+        return false if !@allow_multiple && token.match?(/[,-]/)
+
         types = token.split(',').map do |str|
           uri_type_if_valid(str)
         end
-        return false if types.length > 1 && @single_uri_with_context
 
-        (@allow_mixed_types || types.uniq.length == 1) &&
-          types.all? { |type| @allow_types.include?(type) }
+        return false if !@allow_mixed_types && types.uniq.length > 1
+
+        types.all? { |type| @allow_types.include?(type) }
       end
 
       def parse(token)
@@ -72,7 +84,7 @@ module Main
             uris.push(parse_literal(str))
           end
         end
-        @single_uri_with_context ? uris.first : uris
+        @allow_multiple ? uris : uris.first
       end
 
       private
@@ -93,7 +105,7 @@ module Main
       def parse_literal(str)
         literal = str.match(LITERAL_REGEXP)
         uri = literal[:uri]
-        if @single_uri_with_context
+        if @with_context
           context = literal[:context]
           { uri:, context: }
         else

@@ -102,7 +102,7 @@ module UI
     def on_return(str)
       @return_listener&.call(str)
     rescue Error => e
-      print_raw("$r#{e.print_msg}")
+      print(ScreenMessage.new(e.print_msg))
     end
 
     ##
