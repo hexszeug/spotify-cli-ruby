@@ -4,7 +4,6 @@ module Main
   module Display
     class Error
       def initialize(screen_message)
-        # @todo not here somehow delete loading msgs that got crashed by error
         @screen_message = screen_message
       end
 
