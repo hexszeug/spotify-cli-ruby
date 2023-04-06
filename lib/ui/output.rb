@@ -94,14 +94,13 @@ module UI
     end
 
     def print_display(top_padding = 0, bottom_padding = 0)
-      # @todo fix glitches with scrolling (probably reimplement whole method)
       # fetch messages
       lines_before = 0
       lines_in = 0
       @first_displayed_message = 0
       @first_undisplayed_message = 1 + (
         @display.find_index do |lines|
-          if lines_before + lines.length < @scroll
+          if lines_before + lines_in + lines.length < @scroll
             lines_before += lines.length
             @first_displayed_message += 1
           else
