@@ -211,14 +211,10 @@ module Spotify
         return if body.nil?
 
         begin
-          body = JSON.parse(body, symbolize_names: true)
+          JSON.parse(body, symbolize_names: true)
         rescue JSON::JSONError
-          body = nil
+          nil
         end
-        return if body.nil?
-
-        # @todo create spotify objects (user, album, song, playlist, etc.)
-        body
       end
     end
   end
