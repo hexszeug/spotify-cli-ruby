@@ -83,8 +83,32 @@ module UI
       Utils.length(@markup)
     end
 
+    def width
+      Utils.width(@markup)
+    end
+
+    def height
+      Utils.height(@markup)
+    end
+
+    def lines
+      Utils.lines(@markup).map { |line| Markup.new(line) }
+    end
+
     def chomp
       Markup.new(Utils.chomp(@markup))
+    end
+
+    def strip
+      Markup.new(Utils.strip(@markup))
+    end
+
+    def lstrip
+      Markup.new(Utils.lstrip(@markup))
+    end
+
+    def rstrip
+      Markup.new(Utils.rstrip(@markup))
     end
 
     ##
@@ -110,23 +134,17 @@ module UI
 
     alias [] slice
 
-    def height
-      lines.length
-    end
-
-    def width
-      lines.map(&:chomp).map(&:length).max
-    end
-
-    def lines
-      raw_lines = markup_text.lines.map { |line| Markup.new(line) }
-      raw_lines.each_cons(2) do |line_a, line_b|
-        line_b.replace(line_a.markup.grep(Hash) + line_b.markup)
-      end
+    def scale(max_width)
+      x = Utils.scale(@markup, max_width)
+      Markup.new(x)
     end
 
     def print_to(window, state: {})
       Printer.print(window, @markup, state:)
+    end
+
+    def raw_text
+      Utils.raw_text(@markup)
     end
 
     def markup_text
@@ -145,15 +163,15 @@ module UI
       end
     end
 
-    def ==(other)
-      @markup == other.markup
-    end
-
-    alias eql? ==
-
     def hash
       @markup.hash
     end
+
+    def eql?(other)
+      @markup.eql?(other.markup)
+    end
+
+    alias == eql?
   end
 end
 

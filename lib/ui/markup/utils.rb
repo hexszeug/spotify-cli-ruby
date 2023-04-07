@@ -4,8 +4,28 @@ module UI
   class Markup
     module Utils
       class << self
+        def raw_text(markup)
+          markup.grep(String).join
+        end
+
         def length(markup)
-          markup.grep(String).sum(&:length)
+          raw_text(markup).length
+        end
+
+        def lines(markup)
+          Parser.generate(compact(markup)).lines.map do |line|
+            Parser.parse(line)
+          end.each_cons(2) do |line_a, line_b|
+            line_b.unshift(*line_a.grep(Hash))
+          end
+        end
+
+        def width(markup)
+          lines(markup).map { |line| length(chomp(line)) }.max
+        end
+
+        def height(markup)
+          lines(markup).length
         end
 
         def chomp(markup)
@@ -15,21 +35,51 @@ module UI
           end
         end
 
+        def strip(markup)
+          lstrip(rstrip(markup))
+        end
+
+        def lstrip(markup)
+          i = raw_text(markup).index(/\S/)
+          slice(markup, i..)
+        end
+
+        def rstrip(markup)
+          i = raw_text(markup).rindex(/\S/)
+          slice(markup, ..i)
+        end
+
         def slice(markup, range)
           start, stop = absolute_start_stop(range, length(markup))
           return markup.grep(Hash) if stop < start
 
           i = 0
           markup.map do |token|
-            next '' if i > stop
+            next if i > stop
             next token if token.is_a?(Hash)
-            next '' if i + token.length < start
+            next if i + token.length < start
 
             s = start - i if i < start
             e = stop - i if i + token.length > stop
             i += token.length
             token[s..e]
-          end
+          end.compact
+        end
+
+        def scale(markup, max_width)
+          lines(markup).map do |long_line|
+            lines = [long_line]
+            lines.each do |line|
+              lines.pop
+              line = rstrip(line)
+              next lines.push(line) if width(line) <= max_width
+
+              i = raw_text(line).rindex(/\s/, max_width) || max_width
+              lines.push(slice(line, ...i))
+              lines.push(lstrip(slice(line, i..)))
+            end
+            lines.map { |line| line + [$/] }
+          end.flatten
         end
 
         def compact(markup)

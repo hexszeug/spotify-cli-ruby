@@ -19,7 +19,8 @@ markup = UI::Markup.new(<<~TEXT)
 TEXT
 
 markup.print_to(Curses.stdscr)
-markup.lines.each { |line| line[5, 10].print_to(Curses.stdscr) }
+markup.scale(8).print_to(Curses.stdscr)
+# markup.lines.each { |line| line[5, 10].print_to(Curses.stdscr) }
 
 Curses.getch
 

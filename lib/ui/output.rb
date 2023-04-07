@@ -66,6 +66,7 @@ module UI
     def print(screen_message)
       return unless screen_message.is_a?(ScreenMessage)
 
+      # @todo integrate new markup implementation
       @screen_messages.unshift(screen_message)
       @display.unshift([]) # @todo this is kind of hacky, make it more reliable
     end
