@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module UI
-  module Markup
+  class Markup
     module Colors
       class << self
         COLOR_SCHEME_SIZE = 16
@@ -60,6 +60,22 @@ module UI
           color_array =
             transform_base(color_array_hex, STR_COLOR_BASE, @color_base)
           encode_int_color(color_array) + COLOR_SCHEME_SIZE
+        end
+
+        ##
+        # @return hex_color_id [Integer] the color id of the color
+        # @param [String] `#a3047b` for example
+        def hex_color_string(hex_color_id)
+          return unless @enabled_hex
+
+          hex_color_id -= COLOR_SCHEME_SIZE
+          return unless hex_color_id >= 0 || hex_color_id < @distinct_hex_colors
+
+          color_array = decode_int_color(hex_color_id)
+          color_array_hex =
+            transform_base(color_array, @color_base, STR_COLOR_BASE)
+          hex_color = color_array_hex.map { |c| c.to_s(16).ljust(2, '0') }.join
+          "##{hex_color}"
         end
 
         ##

@@ -2,7 +2,12 @@
 
 module UI
   ##
-  # Module providing utility function for handling markup texts.
+  # Markups can be used to generate and store colored and formatted texts.
+  # To create a markup just pass a markup text to the constructor of this class.
+  # A markup text is just a normal string (single/multi-line) which can contain
+  # markup sequences to change the look of the text after the secquence.
+  # The sequences apply until the next sequence that changes the same attribute
+  # or until the end of the markup.
   #
   # ## Markup sequences
   # Markup sequences are escaped by `$`.
@@ -34,10 +39,8 @@ module UI
   # *Please be aware that the user could change the colors in
   # their terminal emulator. This are only the default values.*
   #
-  # Color modifiers can be suffixed by a `b` to
+  # Color modifiers can be prefixed by a `@` to
   # set the background color instead of the foreground.
-  # **If and ONLY IF the color change is followed by a `b` you can
-  # explicitly specify that you set the foreground color with a `f`.**
   #
   # ### Attribute modifiers:
   # - `*` bold
@@ -57,169 +60,104 @@ module UI
   # - `0b` reset background color
   # - `0C` reset foreground and background color
   # - `0A` reset attributes, forground and background color
-  module Markup
-    # colors
-    COLORS = %w[D R G Y B P C W d r g y b p c w].each_with_index.to_h.freeze
+  class Markup
+    attr_reader :markup
 
-    # attributes
-    attrs = {
-      bold: ['*', Curses::A_BOLD],
-      underline: ['_', Curses::A_UNDERLINE],
-      reverse: ['!', Curses::A_REVERSE],
-      blink: ['~', Curses::A_BLINK],
-      dim: ['%', Curses::A_DIM]
-    }
-    ATTRIBUTES =
-      attrs.transform_values(&:first).invert.freeze
-    CURSES_ATTRIBUTES = Hash.new(0).update(
-      attrs.transform_values(&:last)
-    ).freeze
+    def initialize(arg)
+      replace(arg)
+    end
 
-    # attrubute prefixes
-    ATTR_PREFIXES = Hash.new(:toggle).update(
-      '0' => :reset,
-      '1' => :set
-    ).freeze
-
-    # resets
-    resets = {
-      'c' => { color: -1 }.freeze,
-      'b' => { bg_color: -1 }.freeze,
-      'C' => { color: -1, bg_color: -1 }.freeze,
-      'a' => ATTRIBUTES.each_value.to_h { |key| [key, :reset] }.freeze
-    }
-    RESET_STATE = resets.each_value.reduce(:merge).freeze
-    resets['A'] = RESET_STATE
-    RESETS = resets.freeze
-
-    # regexp
-    REGEXP = Regexp.new(<<~REGEXP.gsub(/\s/, '')).freeze
-      \\$
-      (
-        (?:
-          \\$ |
-          (?:
-            # [0-9a-fA-F]{6} |
-            [#{UI::Markup::COLORS.keys.join}]
-          )(?: b | f (?=b))? |
-          [#{UI::Markup::ATTR_PREFIXES.keys.join}]? [#{UI::Markup::ATTRIBUTES.keys.join}] |
-          0 [#{UI::Markup::RESETS.keys.join}]
-        )?
-      )
-    REGEXP
-
-    class << self
-      ##
-      # Transforms a **markup text** into a **markup array**.
-      # **Markup arrays** consist of strings representing text
-      # and hashes representing markup modifier.
-      # Those modifiers set attributes or color of the text until
-      # they are changed by another modifier.
-      def parse(markup)
-        markup.split(REGEXP).map.with_index do |str, i|
-          i.even? ? str : parse_markup_token(str)
-        end.reject(&:empty?).chunk(&:class).map do |klass, values|
-          klass == String ? values.join : merge_markup_tokens(*values)
+    def replace(arg)
+      @markup =
+        case arg
+        when String then Parser.parse(arg)
+        when Array then Utils.compact(arg)
+        when Markup then arg.markup
+        else raise TypeError,
+                   "no implicit conversion of #{arg.class} into #{String}"
         end
-      end
+      self
+    end
 
-      ##
-      # @param window [Curses::Window]
-      # @param markup [Array]
-      # @param state [Hash]
-      def print(window, markup, state: {})
-        state = merge_markup_tokens(RESET_STATE, state)
-        apply_state(window, state)
-        markup.each do |token|
-          if token.is_a?(String)
-            window.addstr(token)
-            next
+    def length
+      Utils.length(@markup)
+    end
+
+    def chomp
+      Markup.new(Utils.chomp(@markup))
+    end
+
+    ##
+    # @param index [Integer]
+    # @param start [Integer], length [Integer]
+    # @param range [Range]
+    def slice(*args)
+      arg1, arg2 = args
+      range =
+        case arg1
+        when Range then arg1
+        when Integer
+          if arg2.nil?
+            arg1..arg1
+          else
+            arg1 += length if arg1.negative?
+            arg1..(arg1 + arg2)
           end
-
-          state = merge_markup_tokens(state, token)
-          apply_state(window, state)
+        else 0...0
         end
-        state
+      Markup.new(Utils.slice(@markup, range))
+    end
+
+    alias [] slice
+
+    def height
+      lines.length
+    end
+
+    def width
+      lines.map(&:chomp).map(&:length).max
+    end
+
+    def lines
+      raw_lines = markup_text.lines.map { |line| Markup.new(line) }
+      raw_lines.each_cons(2) do |line_a, line_b|
+        line_b.replace(line_a.markup.grep(Hash) + line_b.markup)
       end
+    end
 
-      def print_lines(window, lines, range = nil.., state: {})
-        state = merge_markup_tokens(RESET_STATE, state)
-        state = lines[...(range.begin || 0)].collect_concat do |line|
-          line.grep(Hash)
-        end.reduce(state) do |*tokens|
-          merge_markup_tokens(*tokens)
-        end
-        lines[range].each_with_index do |line, i|
-          line += ["\n"] unless i == lines[range].length - 1
-          state = print(window, line, state:)
-        end
-        state
+    def print_to(window, state: {})
+      Printer.print(window, @markup, state:)
+    end
+
+    def markup_text
+      Parser.generate(@markup)
+    end
+
+    alias to_s markup_text
+
+    def +(other)
+      case other
+      when String then self + Markup.new(other)
+      when Array then Markup.new(@markup + other)
+      when Markup then Markup.new(@markup + other.markup)
+      else raise TypeError,
+                 "no implicit conversion of #{arg.class} into #{Markup}"
       end
+    end
 
-      private
+    def ==(other)
+      @markup == other.markup
+    end
 
-      ##
-      # @param token_str [String]
-      # @return [Hash] markup token
-      def parse_markup_token(token_str)
-        token_str = +token_str
-        return {} if token_str.empty?
+    alias eql? ==
 
-        # colors
-        if token_str.start_with?('#')
-          color = Markup::Colors.hex_color_id(token_str[..6])
-          key = token_str[7] == 'b' ? :bg_color : :color
-          return { key => color }
-        end
-        if (color = COLORS[token_str[0]])
-          key = token_str[1] == 'b' ? :bg_color : :color
-          return { key => color }
-        end
-
-        # attributes
-        action = ATTR_PREFIXES[token_str[0]]
-
-        if (attribute = ATTRIBUTES[token_str[-1]])
-          return { attribute => action }
-        end
-
-        if (reset = RESETS[token_str[-1]]) && action == :reset
-          return reset
-        end
-
-        token_str
-      end
-
-      ##
-      # @param *tokens [Hash]
-      # @return [Hash] markup token
-      def merge_markup_tokens(*tokens)
-        tokens.reduce do |token_a, token_b|
-          token_a.merge(token_b) do |key, old_val, new_val|
-            next new_val if %i[color bg_color].include?(key)
-            next new_val unless new_val == :toggle
-            next :reset if old_val == :set
-            next :set if old_val == :reset
-
-            nil
-          end.compact
-        end
-      end
-
-      def apply_state(window, state)
-        window.attrset(
-          state.filter do |key, value|
-            CURSES_ATTRIBUTES.key?(key) && value == :set
-          end.map do |key, _value|
-            CURSES_ATTRIBUTES[key]
-          end.reduce(0, :|)
-        )
-        window.color_set(
-          Colors.color_pair(state[:color], state[:bg_color])
-        )
-      end
+    def hash
+      @markup.hash
     end
   end
 end
 
 require_relative 'markup/colors'
+require_relative 'markup/parser'
+require_relative 'markup/printer'
+require_relative 'markup/utils'
