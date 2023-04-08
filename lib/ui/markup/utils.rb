@@ -12,20 +12,25 @@ module UI
           raw_text(markup).length
         end
 
-        def lines(markup)
-          Parser.generate(compact(markup)).lines.map do |line|
+        def lines(markup, safe: true)
+          # @todo reimplement in terms of slice() for performance improvement
+          lines = Parser.generate(compact(markup)).lines.map do |line|
             Parser.parse(line)
-          end.each_cons(2) do |line_a, line_b|
-            line_b.unshift(*line_a.grep(Hash))
           end
+          if safe
+            lines.each_cons(2) do |line_a, line_b|
+              line_b.unshift(*line_a.grep(Hash))
+            end
+          end
+          lines
         end
 
         def width(markup)
-          lines(markup).map { |line| length(chomp(line)) }.max
+          raw_text(markup).lines.map { |line| line.chomp.length }.max || 0
         end
 
         def height(markup)
-          lines(markup).length
+          raw_text(markup).lines.length
         end
 
         def chomp(markup)
@@ -49,37 +54,55 @@ module UI
           slice(markup, ..i)
         end
 
-        def slice(markup, range)
-          start, stop = absolute_start_stop(range, length(markup))
-          return markup.grep(Hash) if stop < start
+        def slice(markup, range, safe: true)
+          absolute_start, absolute_stop = absolute_start_stop(range,
+                                                              length(markup))
+          # @todo only return hashes before start (and only if safe)
+          return markup.grep(Hash) if absolute_stop < absolute_start
 
           i = 0
           markup.map do |token|
-            next if i > stop
-            next token if token.is_a?(Hash)
-            next if i + token.length < start
+            if token.is_a?(Hash)
+              if (absolute_start..absolute_stop).include?(i) ||
+                 (safe && i < absolute_start)
+                next token
+              end
 
-            s = start - i if i < start
-            e = stop - i if i + token.length > stop
+              next
+            end
+
+            token_start = i
+            token_stop = i + token.length - 1
             i += token.length
-            token[s..e]
+            next if token_start > absolute_stop
+            next if token_stop < absolute_start
+
+            if token_start < absolute_start
+              relative_start = absolute_start - token_start
+            end
+            if token_stop > absolute_stop
+              relative_stop = absolute_stop - token_start
+            end
+            token[relative_start..relative_stop]
           end.compact
         end
 
         def scale(markup, max_width)
-          lines(markup).map do |long_line|
-            lines = [long_line]
-            lines.each do |line|
-              lines.pop
-              line = rstrip(line)
-              next lines.push(line) if width(line) <= max_width
+          lines = lines(markup, safe: false)
+          lines.each_with_index do |line, i|
+            line.replace(rstrip(line))
+            next if length(line) <= max_width
 
-              i = raw_text(line).rindex(/\s/, max_width) || max_width
-              lines.push(slice(line, ...i))
-              lines.push(lstrip(slice(line, i..)))
-            end
-            lines.map { |line| line + [$/] }
-          end.flatten
+            start_new =
+              raw_text(line).rindex(/(?<!\s)\s/, max_width) || max_width
+            old_line = slice(line, ...start_new, safe: false)
+            new_line = slice(line, start_new.., safe: false)
+            new_line = lstrip(new_line)
+            line.replace(old_line)
+            lines.insert(i + 1, new_line)
+          end
+          new_markup = lines.map { |line| line + [$/] }.flatten
+          chomp(markup) == markup ? chomp(new_markup) : new_markup
         end
 
         def compact(markup)
@@ -118,8 +141,10 @@ module UI
           start += length if start.negative?
           stop += length if stop.negative?
           stop -= 1 if range.exclude_end?
-          start = start.clamp(0, length - 1)
-          stop = stop.clamp(0, length - 1)
+          # rubocop:disable Style/ComparableClamp (clamp doesn't work when min == max)
+          start = [[start, 0].max, length - 1].min
+          stop = [[stop, 0].max, length - 1].min
+          # rubocop:enable Style/ComparableClamp
           [start, stop]
         end
       end

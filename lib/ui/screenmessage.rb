@@ -27,8 +27,7 @@ module UI
 
     def generate(max_width)
       @changed = false
-      markup = @decorator&.generate(max_width) || Markup.new(@content)
-      markup.scale(max_width)
+      Markup.new(@decorator&.generate(max_width) || @content).scale(max_width)
     end
   end
 end

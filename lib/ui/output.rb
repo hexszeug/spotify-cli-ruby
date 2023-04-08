@@ -28,6 +28,7 @@ module UI
 
     def refresh(force: false)
       # @todo add scroll bar
+      # @todo reimplement with improved performance
       force = true if @changed_size
       first_change = @screen_messages.find_index(&:changed?)
       first_change = 0 if force
@@ -66,9 +67,8 @@ module UI
     def print(screen_message)
       return unless screen_message.is_a?(ScreenMessage)
 
-      # @todo integrate new markup implementation
       @screen_messages.unshift(screen_message)
-      @display.unshift([]) # @todo this is kind of hacky, make it more reliable
+      @display.unshift(nil) # @todo this is kind of hacky, make it more reliable
     end
 
     def scroll(amount = 0, absolute: false)
@@ -80,36 +80,36 @@ module UI
     private
 
     def generate_least_as_possible(offset, force)
-      generated_lines = @display[...offset].map(&:length).sum
+      generated_lines = @display[...offset].map(&:height).sum
       overscrolled =
         @screen_messages[offset..].each.with_index(offset) do |message, i|
-          @display[i] = message.lines(@width) if force || message.changed?
-          generated_lines += @display[i].length
+          @display[i] = message.generate(@width) if force || message.changed?
+          generated_lines += @display[i].height
           break false if generated_lines >= @scroll + @height
         end
       return unless overscrolled
 
-      max_scroll = [@display.map(&:length).sum - @height, 0].max
+      max_scroll = [@display.map(&:height).sum - @height, 0].max
       @scroll = max_scroll if @scroll > max_scroll
     end
 
     def print_display(top_padding = 0, bottom_padding = 0)
-      # fetch messages
+      # fetch markups
       lines_before = 0
       lines_in = 0
       @first_displayed_message = 0
       @first_undisplayed_message = 1 + (
-        @display.find_index do |lines|
-          if lines_before + lines_in + lines.length < @scroll
-            lines_before += lines.length
+        @display.find_index do |markup|
+          if lines_before + lines_in + markup.height < @scroll
+            lines_before += markup.height
             @first_displayed_message += 1
           else
-            lines_in += lines.length
+            lines_in += markup.height
           end
           lines_before + lines_in >= @scroll + @height
         end || (@display.length - 1)
       )
-      messages =
+      markups =
         @display[@first_displayed_message...@first_undisplayed_message].reverse
 
       # clear screen
@@ -122,14 +122,14 @@ module UI
       bottom_margin = @scroll - lines_before
       top_margin = lines_in - bottom_margin - @height
       y = -top_margin
-      messages.each do |lines|
+      markups.each do |markup|
         start = [top_padding - y, 0].max
         stop = @height - bottom_padding - y
-        if start < lines.length && stop.positive?
+        if start < markup.height && stop.positive?
           @win.setpos(y + start, 0)
-          Markup.print_lines(@win, lines, start...stop)
+          markup.lines[start...stop].each { |line| line.print_to(@win) }
         end
-        y += lines.length
+        y += markup.height
       end
     end
   end

@@ -135,8 +135,7 @@ module UI
     alias [] slice
 
     def scale(max_width)
-      x = Utils.scale(@markup, max_width)
-      Markup.new(x)
+      Markup.new(Utils.scale(@markup, max_width))
     end
 
     def print_to(window, state: {})
