@@ -58,6 +58,7 @@ module UI
       ch = @win.get_char
       return unless ch
 
+      # @todo make keys more accessible for different os
       # read_* return values:
       # false: no match
       # nil: match but no action performed
@@ -93,7 +94,7 @@ module UI
 
     def read_delete(char)
       case char
-      when BACKSPACE
+      when BACKSPACE, "\x7f" # unicode 7f (DEL) on mac
         return unless @cursor.positive?
 
         @string.slice! @cursor - 1
