@@ -13,7 +13,7 @@ module UI
         end
 
         def lines(markup, safe: true)
-          # @todo reimplement in terms of slice() for performance improvement
+          # @todo reimplement in without parse or slice for performance improvement
           lines = Parser.generate(compact(markup)).lines.map do |line|
             Parser.parse(line)
           end
@@ -87,7 +87,7 @@ module UI
           end.compact
         end
 
-        def scale(markup, max_width)
+        def old_scale(markup, max_width)
           lines = lines(markup, safe: false)
           lines.each_with_index do |line, i|
             line.replace(rstrip(line))
@@ -103,6 +103,27 @@ module UI
           end
           new_markup = lines.map { |line| line + [$/] }.flatten
           chomp(markup) == markup ? chomp(new_markup) : new_markup
+        end
+
+        def scale(markup, max_width)
+          new_markup = markup.dup
+          curr_line = ''
+          new_markup.each do |token|
+            next if token.is_a?(Hash)
+
+            token.sub!(/\G\s*/m, '') if curr_line.empty?
+            start_token_in_line = curr_line.length
+            curr_line += token
+            while curr_line.rstrip.length > max_width
+              start_new_in_line =
+                curr_line.rindex(/(?<=\S)\s/m, max_width) || max_width
+              start_new_in_token = start_new_in_line - start_token_in_line
+              token.sub!(/(?<=\G.{#{start_new_in_token}})\s*/m, '')
+              curr_line = token[start_new_in_token..]
+              start_token_in_line -= start_new_in_token # @todo dont forget striped whitespace
+              token.insert(start_new_in_token, $/)
+            end
+          end
         end
 
         def compact(markup)
