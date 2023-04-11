@@ -6,7 +6,7 @@ module UI
 
     def print(content = nil, type: nil)
       @print ||= Print.new
-      if content.nil?
+      if content.nil? && type.nil?
         @print
       else
         @print.create(content, type:)

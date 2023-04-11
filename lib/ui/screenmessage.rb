@@ -20,7 +20,7 @@ module UI
 
     def replace(content, type: nil)
       touch
-      @content = content
+      @content = content || ''
       @decorator&.delete
       @decorator = type&.new(self)
       self
