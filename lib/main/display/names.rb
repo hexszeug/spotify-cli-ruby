@@ -16,7 +16,7 @@ module Main
         "#{name} $%(#{ctx_id})$%"
       end
 
-      def artists(*artists)
+      def artists(artists)
         artists.map { |artist| artist(artist) }.join(', ')
       end
 

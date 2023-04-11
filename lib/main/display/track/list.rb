@@ -69,7 +69,7 @@ module Main
             table.add_row(
               (i + 1).to_s,
               track(track),
-              artists(*track[:artists]),
+              artists(track[:artists]),
               album(track[:album])
             )
           end
