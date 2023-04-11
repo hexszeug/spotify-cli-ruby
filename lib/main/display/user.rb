@@ -2,9 +2,9 @@
 
 module Main
   module Display
-    module Entities
+    module User
     end
   end
 end
 
-require_relative 'entities/user_details'
+require_relative 'user/details'

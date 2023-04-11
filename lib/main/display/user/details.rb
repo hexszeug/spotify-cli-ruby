@@ -2,8 +2,8 @@
 
 module Main
   module Display
-    module Entities
-      class UserDetails
+    module User
+      class Details
         def initialize(screen_message)
           @screen_message = screen_message
           Context.register([screen_message.content[:uri]])

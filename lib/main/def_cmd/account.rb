@@ -50,7 +50,7 @@ module Main
           Fetching user info.$~.
         TEXT
         Spotify::API::Users.get_current_users_profile do |user|
-          print[:info].replace(user, type: Display::Entities::UserDetails)
+          print[:info].replace(user, type: Display::User::Details)
         end.error do |e|
           print[:info].replace(e, type: Display::Error)
         end
