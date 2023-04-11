@@ -87,43 +87,19 @@ module UI
           end.compact
         end
 
-        def old_scale(markup, max_width)
-          lines = lines(markup, safe: false)
-          lines.each_with_index do |line, i|
-            line.replace(rstrip(line))
-            next if length(line) <= max_width
-
-            start_new =
-              raw_text(line).rindex(/(?<!\s)\s/, max_width) || max_width
-            old_line = slice(line, ...start_new, safe: false)
-            new_line = slice(line, start_new.., safe: false)
-            new_line = lstrip(new_line)
-            line.replace(old_line)
-            lines.insert(i + 1, new_line)
-          end
-          new_markup = lines.map { |line| line + [$/] }.flatten
-          chomp(markup) == markup ? chomp(new_markup) : new_markup
-        end
-
         def scale(markup, max_width)
-          new_markup = markup.dup
-          curr_line = ''
-          new_markup.each do |token|
-            next if token.is_a?(Hash)
+          # @todo there are still some weird glitches but not that important
+          lines(markup, safe: false).map do |long_line|
+            lines = [long_line]
+            lines.each do |line|
+              str = raw_text(line).rstrip
+              next unless str.length > max_width
 
-            token.sub!(/\G\s*/m, '') if curr_line.empty?
-            start_token_in_line = curr_line.length
-            curr_line += token
-            while curr_line.rstrip.length > max_width
-              start_new_in_line =
-                curr_line.rindex(/(?<=\S)\s/m, max_width) || max_width
-              start_new_in_token = start_new_in_line - start_token_in_line
-              token.sub!(/(?<=\G.{#{start_new_in_token}})\s*/m, '')
-              curr_line = token[start_new_in_token..]
-              start_token_in_line -= start_new_in_token # @todo dont forget striped whitespace
-              token.insert(start_new_in_token, $/)
+              index = str.rindex(/\s/, max_width) || max_width
+              lines.pop
+              lines.push(*split_line_at(line, index))
             end
-          end
+          end.flatten
         end
 
         def compact(markup)
@@ -167,6 +143,24 @@ module UI
           stop = [[stop, 0].max, length - 1].min
           # rubocop:enable Style/ComparableClamp
           [start, stop]
+        end
+
+        def split_line_at(line, index)
+          curr_index = 0
+          line_a = []
+          line_b = line.drop_while do |token|
+            line_a.push(token)
+            next true unless token.is_a?(String)
+
+            curr_index += token.length
+            curr_index <= index
+          end
+          return [line, []] if curr_index < index
+
+          overflow = curr_index - index
+          line_a[-1] = line_a.last[...-overflow] + $/
+          line_b[0] = line_b.first[-overflow..].lstrip
+          [line_a, line_b]
         end
       end
     end

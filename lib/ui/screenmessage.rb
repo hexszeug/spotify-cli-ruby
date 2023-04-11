@@ -14,11 +14,12 @@ module UI
     end
 
     def touch
+      @buf = {}
       @changed = true
     end
 
     def replace(content, type: nil)
-      @changed = true
+      touch
       @content = content
       @decorator&.delete
       @decorator = type&.new(self)
@@ -27,7 +28,8 @@ module UI
 
     def generate(max_width)
       @changed = false
-      Markup.new(@decorator&.generate(max_width) || @content).scale(max_width)
+      @buf[max_width] ||=
+        Markup.new(@decorator&.generate(max_width) || @content).scale(max_width)
     end
   end
 end

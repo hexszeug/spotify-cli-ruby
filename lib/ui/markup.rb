@@ -76,19 +76,20 @@ module UI
         else raise TypeError,
                    "no implicit conversion of #{arg.class} into #{String}"
         end
+      @length = @width = @height = @raw_text = @markup_text = nil
       self
     end
 
     def length
-      Utils.length(@markup)
+      @length ||= Utils.length(@markup)
     end
 
     def width
-      Utils.width(@markup)
+      @width ||= Utils.width(@markup)
     end
 
     def height
-      Utils.height(@markup)
+      @height ||= Utils.height(@markup)
     end
 
     def lines
@@ -143,11 +144,11 @@ module UI
     end
 
     def raw_text
-      Utils.raw_text(@markup)
+      @raw_text ||= Utils.raw_text(@markup)
     end
 
     def markup_text
-      Parser.generate(@markup)
+      @markup_text ||= Parser.generate(@markup)
     end
 
     alias to_s markup_text
