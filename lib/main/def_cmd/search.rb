@@ -30,12 +30,14 @@ module Main
             $*$_Serach results for '#{q}':$*$_
           TEXT
           page.each do |key, value|
-            search_obj = {
-              q:,
-              type: key,
-              items: value[:items]
-            }
-            print search_obj, type: Display::Entities::SearchResults
+            case key
+            when :tracks
+              list = {
+                title: "Searched for '#{q.gsub('$', '$$')}' in #{key}",
+                tracks: value[:items]
+              }
+              print(list, type: Display::Track::List)
+            end
           end
         end.error do |e|
           screen_message.replace(e, type: Display::Error)

@@ -11,6 +11,7 @@ module Main
       # - align: `:left`, `:center` or `:right`
       # - (vertical_align: `:top`, `:center` or `:bottom`)
       # - overflow: `:hidden`, `:tripple_dot` or (`:line_break`)
+      # - title: [String]
       #
       # () = does nothing
       #
@@ -35,6 +36,10 @@ module Main
           end
         end
         @rows = []
+
+        return unless @columns.any? { |col| col[:title] }
+
+        add_row(*@columns.map { |col| "$1*#{col[:title]}" })
       end
 
       def add_row(*cells)
@@ -46,10 +51,14 @@ module Main
       end
 
       def generate(width)
+        return '' if @columns.empty?
+
+        gap_str = "\n" * @vertical_gap
         column_widths = calculate_column_widths(width)
-        @rows.map do |row|
+        row_strs = @rows.map do |row|
           generate_row(row, column_widths)
-        end.join("\n" * (@vertical_gap + 1))
+        end
+        "#{gap_str}#{row_strs.join("\n#{gap_str}")}#{gap_str}"
       end
 
       private
@@ -76,14 +85,16 @@ module Main
 
       def generate_row(row, column_widths)
         # @todo implement multiline rows
-        row.map.with_index do |cell, i|
+        # @todo scroll glitch when using verical gap
+        gap_str = ' ' * @gap
+        cell_strs = row.map.with_index do |cell, i|
           width = column_widths[i]
           if cell.width > width
             cell =
               case @columns[i][:overflow]
               when :hidden then cell[...width]
               when :tripple_dot
-                width > 3 ? "#{cell[...(width - 3)]}..." : '.' * width
+                width > 3 ? "#{cell[...(width - 3)]}$0A..." : '.' * width
               end
           elsif cell.width < width
             m = width - cell.width
@@ -95,8 +106,9 @@ module Main
                 "#{' ' * (m / 2)}#{cell}#{' ' * (m - (m / 2))}"
               end
           end
-          cell
-        end.join(' ' * @gap)
+          "#{cell}$0A"
+        end
+        "#{gap_str}#{cell_strs.join(gap_str)}#{gap_str}"
       end
     end
   end

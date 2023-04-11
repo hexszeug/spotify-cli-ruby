@@ -136,6 +136,8 @@ module UI
     alias [] slice
 
     def scale(max_width)
+      return self if width <= max_width
+
       Markup.new(Utils.scale(@markup, max_width))
     end
 
