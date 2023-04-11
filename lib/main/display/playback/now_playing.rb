@@ -31,7 +31,7 @@ module Main
 
           track = @playback[:item]
           <<~TEXT
-            Now playing: $*#{track(track)}$* by $%$*#{artists(track[:artists])}$*$%
+            Now playing: $*#{track(track)}$* by $*#{artists(track[:artists])}$*
           TEXT
         end
       end

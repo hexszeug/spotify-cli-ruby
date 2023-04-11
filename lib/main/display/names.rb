@@ -7,13 +7,15 @@ module Main
         ctx_id = Context.hook(track[:uri], self)
         name = escape(track[:name])
         name += ' $! E $!' if track[:explicit]
-        "#{name} $%(#{ctx_id})$%"
+        name += " $%(#{ctx_id})$%" unless ctx_id.nil?
+        name
       end
 
       def artist(artist)
         ctx_id = Context.hook(artist[:uri], self)
         name = escape(artist[:name])
-        "#{name} $%(#{ctx_id})$%"
+        name += " $%(#{ctx_id})$%" unless ctx_id.nil?
+        name
       end
 
       def artists(artists)
@@ -23,7 +25,8 @@ module Main
       def album(album)
         ctx_id = Context.hook(album[:uri], self)
         name = escape(album[:name])
-        "#{name} $%(#{ctx_id})$%"
+        name += " $%(#{ctx_id})$%" unless ctx_id.nil?
+        name
       end
 
       def escape(str)
