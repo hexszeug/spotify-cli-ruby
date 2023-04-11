@@ -19,27 +19,15 @@ module Main
 
       private
 
-      def search(q, type: %i[track artist])
+      def search(q, type: %i[track])
         display_q = q.gsub('$', '$$')
         screen_message = print <<~TEXT
           Searching for '#{display_q}'.$~.
         TEXT
         Spotify::API::Search.search_for_item(
-          q:, type:, pagination: Spotify::API::Pagination.new
-        ) do |page|
-          screen_message.replace(<<~TEXT)
-            $*$_Serach results for '#{display_q}':$*$_
-          TEXT
-          page.each do |key, value|
-            case key
-            when :tracks
-              list = {
-                title: "Searched for '#{display_q}' in #{key}",
-                tracks: value[:items]
-              }
-              print(list, type: Display::Track::List)
-            end
-          end
+          q:, type:, pagination: Spotify::API::Pagination.new(limit: 100)
+        ) do |results|
+          screen_message.replace({ q:, results: }, type: Display::Search)
         end.error do |e|
           screen_message.replace(e, type: Display::Error)
         end

@@ -29,6 +29,13 @@ module Main
         name
       end
 
+      def user(user)
+        ctx_id = Context.hook(user[:uri], self)
+        name = escape(user[:display_name])
+        name += " $%(#{ctx_id})$%" unless ctx_id.nil?
+        name
+      end
+
       def escape(str)
         str.gsub('$', '$$')
       end

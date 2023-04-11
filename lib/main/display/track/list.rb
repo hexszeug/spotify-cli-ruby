@@ -6,16 +6,34 @@ module Main
       class List
         include Names
 
-        def initialize(screen_message)
-          @screen_message = screen_message
-          @title = screen_message.content[:title]
-          tracks = screen_message.content[:tracks]
-          register_context(tracks)
-          @table = generate_table(tracks)
+        def initialize(
+          tracks,
+          title: nil,
+          context: nil,
+          index: true,
+          artists: true,
+          album: true,
+          &update
+        )
+          @tracks =
+            if context.nil?
+              tracks
+            else
+              tracks.map do |track|
+                track.merge(uri: "#{context[:uri]}/#{track[:uri]}")
+              end
+            end
+          @title = title
+          @index = index
+          @artists = artists
+          @album = album
+          @update = update
+          register_tracks
         end
 
         def context_updated
-          @screen_message.touch
+          @table = nil
+          @update&.call
         end
 
         def delete
@@ -23,55 +41,75 @@ module Main
         end
 
         def generate(max_width)
+          @table ||= generate_table
           <<~TEXT
-              $*#{@title}$*
+            $*#{@title || 'Songs'}$*
             #{@table.generate(max_width)}
           TEXT
         end
 
         private
 
-        def register_context(tracks)
-          Context.register(tracks.map { |track| track[:uri] })
-          Context.register(
-            tracks.flat_map do |track|
-              track[:artists].map { |artist| artist[:uri] }
-            end
-          )
-          Context.register(tracks.map { |track| track[:album][:uri] })
+        def register_tracks
+          if @artists
+            Context.register(
+              @tracks.flat_map do |track|
+                track[:artists].map { |artist| artist[:uri] }
+              end
+            )
+          end
+          if @album
+            Context.register(
+              @tracks.map { |track| track[:album][:uri] }
+            )
+          end
+          Context.register(@tracks.map { |track| track[:uri] })
         end
 
-        def generate_table(tracks)
-          table = Display::Table.new(
-            {
-              title: '#',
-              width: 3,
-              align: :right
-            },
+        def generate_table
+          columns = []
+          if @index
+            columns.push(
+              {
+                title: '#',
+                width: 3,
+                align: :right
+              }
+            )
+          end
+          columns.push(
             {
               title: 'Title',
               width: { fraction: 4, min: 10 },
               overflow: :tripple_dot
-            },
-            {
-              title: 'Artists',
-              width: { fraction: 2 },
-              overflow: :tripple_dot
-            },
-            {
-              title: 'Album',
-              width: { fraction: 3 },
-              overflow: :tripple_dot
-            },
-            gap: 2
+            }
           )
-          tracks.each_with_index do |track, i|
-            table.add_row(
-              (i + 1).to_s,
-              track(track),
-              artists(track[:artists]),
-              album(track[:album])
+          if @artists
+            columns.push(
+              {
+                title: 'Artists',
+                width: { fraction: 2 },
+                overflow: :tripple_dot
+              }
             )
+          end
+          if @album
+            columns.push(
+              {
+                title: 'Album',
+                width: { fraction: 3 },
+                overflow: :tripple_dot
+              }
+            )
+          end
+          table = Display::Table.new(*columns, gap: 2)
+          @tracks.each_with_index do |track, i|
+            row = []
+            row.push((i + 1).to_s) if @index
+            row.push(track(track))
+            row.push(artists(track[:artists])) if @artists
+            row.push(album(track[:album])) if @album
+            table.add_row(*row)
           end
           table
         end

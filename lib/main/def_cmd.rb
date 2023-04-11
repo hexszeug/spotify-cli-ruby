@@ -13,6 +13,7 @@ module Main
         TopItems.new(@dispatcher)
         Search.new(@dispatcher)
         Play.new(@dispatcher)
+        Details.new(@dispatcher)
       end
 
       def execute(str)
@@ -36,3 +37,4 @@ require_relative 'def_cmd/account'
 require_relative 'def_cmd/top_items'
 require_relative 'def_cmd/search'
 require_relative 'def_cmd/play'
+require_relative 'def_cmd/details'
