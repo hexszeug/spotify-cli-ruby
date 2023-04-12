@@ -48,7 +48,7 @@ module Spotify
     # @return [nil]
     def cancel
       @canceled = true
-      @cancel&.call(error)
+      @cancel&.call(@arg_error)
     end
 
     ##

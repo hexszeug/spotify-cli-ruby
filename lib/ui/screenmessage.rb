@@ -21,10 +21,10 @@ module UI
 
     def replace(content, type: nil)
       @mutex.lock
-      touch
       @content = content || ''
       @decorator&.delete
       @decorator = type&.new(self)
+      touch
       self
     ensure
       @mutex.unlock

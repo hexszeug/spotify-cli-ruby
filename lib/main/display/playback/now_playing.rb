@@ -9,10 +9,15 @@ module Main
         def initialize(screen_message)
           @screen_message = screen_message
           @promise = Spotify::API::Player.get_playback_state do |state|
+            if (context = state[:context])
+              state[:context] = fetch_context(context)
+            end
             @playback = state
-            fetch_context if @playback[:context]
             @screen_message.touch
+          rescue Spotify::SpotifyError => e
+            @promise.fail(e)
           end.error do |e|
+            @promise = nil
             @screen_message.replace(e, type: Display::Error)
           end
         end
@@ -22,7 +27,7 @@ module Main
         end
 
         def delete
-          @promise.cancel
+          @promise&.cancel
         end
 
         def generate(_width)
@@ -58,17 +63,29 @@ module Main
 
         private
 
-        def fetch_context
+        def fetch_context(context)
           # @todo fetch other contexts
-          context = @playback[:context]
           type = context[:type]
           uri = context[:uri]
           id = uri.split(':').last
-          @playback[:context] =
+          context.merge(
             case type
             when 'album' then Spotify::API::Albums.get_album(id:)
+            when 'playlist'
+              Spotify::API::Playlists.get_playlist(
+                playlist_id: id,
+                fields: Spotify::API::Fields.new(
+                  {
+                    name: true,
+                    owner: {
+                      display_name: true
+                    }
+                  }
+                )
+              )
             else context
             end
+          )
         end
       end
     end
