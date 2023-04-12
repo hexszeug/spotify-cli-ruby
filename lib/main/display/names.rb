@@ -36,6 +36,13 @@ module Main
         name
       end
 
+      def playlist(playlist)
+        ctx_id = Context.hook(playlist[:uri], self)
+        name = escape(playlist[:name])
+        name += " $%(#{ctx_id})$%" unless ctx_id.nil?
+        name
+      end
+
       def escape(str)
         str.gsub('$', '$$')
       end

@@ -30,7 +30,7 @@ module Main
       end
 
       def hook(uri, hook)
-        return unless hook.respond_to?(:context_updated)
+        return unless hook.respond_to?(:context_updated) && @indices.key?(uri)
 
         @hooks[hook].add(uri)
         @indices[uri] + 1
