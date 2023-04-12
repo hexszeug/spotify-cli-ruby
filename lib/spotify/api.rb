@@ -222,6 +222,7 @@ end
 
 require_relative 'api/pagination'
 
+require_relative 'api/albums'
 require_relative 'api/search'
 require_relative 'api/users'
 require_relative 'api/player'
