@@ -19,13 +19,13 @@ module Main
 
       private
 
-      def search(q, type: %i[track])
+      def search(q, type: %i[track album])
         display_q = q.gsub('$', '$$')
         screen_message = print <<~TEXT
           Searching for '#{display_q}'.$~.
         TEXT
         Spotify::API::Search.search_for_item(
-          q:, type:, pagination: Spotify::API::Pagination.new(limit: 100)
+          q:, type:, pagination: Spotify::API::Pagination.new(20)
         ) do |results|
           screen_message.replace({ q:, results: }, type: Display::Search)
         end.error do |e|

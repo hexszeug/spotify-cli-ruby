@@ -6,14 +6,19 @@ module Main
       include Names
 
       def initialize(screen_message)
-        # @todo display other search results than tracks
+        # @todo display other search results
         search = screen_message.content
         @lists = search[:results].map do |key, value|
           case key
           when :tracks
             Display::Track::List.new(
               value[:items],
-              title: "Searched for '#{escape(search[:q])}' in #{key}"
+              title: "$*Searched for '#{escape(search[:q])}' in tracks$*"
+            ) { screen_message.touch }
+          when :albums
+            Display::Album::List.new(
+              value[:items],
+              title: "$*Searched for '#{escape(search[:q])}' in albums$*"
             ) { screen_message.touch }
           end
         end

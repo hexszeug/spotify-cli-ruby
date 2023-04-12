@@ -20,26 +20,10 @@ module Main
         @gap = gap
         @vertical_gap = vertical_gap
 
-        @columns = columns.each do |col|
-          if (width = col[:width]).is_a?(Integer)
-            col[:width] = [col[:width], 0].max
-          else
-            col[:width] = {
-              min: 0,
-              fraction: 1
-            }
-            col[:width].update(width) if width.is_a?(Hash)
-          end
-          col[:align] = :left unless %i[left center right].include?(col[:align])
-          unless %i[hidden tripple_dot].include?(col[:overflow])
-            col[:overflow] = :hidden
-          end
+        @columns = columns.map do |col|
+          defaultize_column(col)
         end
         @rows = []
-
-        return unless @columns.any? { |col| col[:title] }
-
-        add_row(*@columns.map { |col| "$1*#{col[:title]}" })
       end
 
       def add_row(*cells)
@@ -50,6 +34,16 @@ module Main
         @rows.push(cells.map { |cell| UI::Markup.new(cell) })
       end
 
+      def add_column(column, *cells)
+        @rows = Array.new(cells.length) { [] } if @rows.empty?
+        unless cells.length == @rows.length
+          raise ArgumentError, 'wrong cell count'
+        end
+
+        @columns.push(defaultize_column(column))
+        @rows.zip(cells).each { |row, cell| row.push(UI::Markup.new(cell)) }
+      end
+
       def generate(width)
         return '' if @columns.empty?
 
@@ -58,13 +52,42 @@ module Main
         row_strs = @rows.map do |row|
           generate_row(row, column_widths)
         end
+        if @columns.any? { |col| col[:title] }
+          row_strs.unshift(
+            generate_row(
+              @columns.map do |col|
+                UI::Markup.new("$*#{col[:title]}$*")
+              end,
+              column_widths
+            )
+          )
+        end
         "#{gap_str}#{row_strs.join("\n#{gap_str}")}#{gap_str}"
       end
 
       private
 
+      def defaultize_column(col)
+        col = {
+          width: {},
+          align: :left,
+          vertical_align: :top,
+          overflow: :hidden
+        }.merge(col)
+        if (width = col[:width]).is_a?(Integer)
+          col[:width] = [col[:width], 0].max
+        else
+          col[:width] = {
+            min: 0,
+            fraction: 1
+          }
+          col[:width].update(width) if width.is_a?(Hash)
+        end
+        col
+      end
+
       def calculate_column_widths(total_width)
-        gaps = (@columns.length - 1) * @gap
+        gaps = (@columns.length) * @gap
         widths = @columns.map { |col| col[:width] }
         fraction = nil
         loop do
@@ -108,7 +131,7 @@ module Main
           end
           "#{cell}$0A"
         end
-        "#{gap_str}#{cell_strs.join(gap_str)}#{gap_str}"
+        "#{gap_str}#{cell_strs.join(gap_str)}"
       end
     end
   end

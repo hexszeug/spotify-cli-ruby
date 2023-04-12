@@ -30,6 +30,7 @@ module Main
           TEXT
 
           track = @playback[:item]
+          # @todo display playback context (item can be null if playing context etc.)
           <<~TEXT
             Now playing: $*#{track(track)}$* by $*#{artists(track[:artists])}$*
           TEXT

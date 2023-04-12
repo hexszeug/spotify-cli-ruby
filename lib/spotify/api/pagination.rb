@@ -7,7 +7,7 @@ module Spotify
 
       attr_reader :limit, :offset
 
-      def initialize(limit: Float::INFINITY, offset: 0)
+      def initialize(limit = Float::INFINITY, offset: 0)
         @limit = limit if limit.is_a?(Integer) && limit.positive?
         @limit ||= Float::INFINITY
         @offset = offset.is_a?(Integer) && offset >= 0 ? offset : 0

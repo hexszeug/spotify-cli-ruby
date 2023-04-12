@@ -8,7 +8,7 @@ module Main
 
         def initialize(
           tracks,
-          title: nil,
+          title: '$*Songs$*',
           context: nil,
           index: :index,
           artists: true,
@@ -43,7 +43,7 @@ module Main
         def generate(max_width)
           @table ||= generate_table
           <<~TEXT
-            $*#{@title || 'Songs'}$*
+            #{@title}
             #{@table.generate(max_width)}
           TEXT
         end
@@ -67,50 +67,54 @@ module Main
         end
 
         def generate_table
-          columns = []
-          if @index
-            columns.push(
+          table = Table.new(gap: 2)
+          if @index == :index
+            table.add_column(
               {
                 title: '#',
                 width: 3,
                 align: :right
-              }
+              },
+              *1.upto(@tracks.length).map(&:to_s)
             )
           end
-          columns.push(
+          if @index == :track_number
+            table.add_column(
+              {
+                title: '#',
+                width: 3,
+                align: :right
+              },
+              *@tracks.map { |track| track[:track_number].to_s }
+            )
+          end
+          table.add_column(
             {
               title: 'Title',
               width: { fraction: 4, min: 10 },
               overflow: :tripple_dot
-            }
+            },
+            *@tracks.map { |track| track(track) }
           )
           if @artists
-            columns.push(
+            table.add_column(
               {
                 title: 'Artists',
                 width: { fraction: 2 },
                 overflow: :tripple_dot
-              }
+              },
+              *@tracks.map { |track| artists(track[:artists]) }
             )
           end
           if @album
-            columns.push(
+            table.add_column(
               {
                 title: 'Album',
                 width: { fraction: 3 },
                 overflow: :tripple_dot
-              }
+              },
+              *@tracks.map { |track| album(track[:album]) }
             )
-          end
-          table = Display::Table.new(*columns, gap: 2)
-          @tracks.each_with_index do |track, i|
-            row = []
-            row.push((i + 1).to_s) if @index == :index
-            row.push(track[:track_number].to_s) if @index == :track_number
-            row.push(track(track))
-            row.push(artists(track[:artists])) if @artists
-            row.push(album(track[:album])) if @album
-            table.add_row(*row)
           end
           table
         end
