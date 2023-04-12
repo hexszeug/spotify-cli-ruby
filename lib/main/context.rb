@@ -6,7 +6,9 @@ module Main
       hash[key] = []
     end
     @indices = {}
-    @hooks = {}
+    @hooks = Hash.new do |hash, key|
+      hash[key] = Set.new
+    end
     class << self
       def lookup(id, pool_id = 'track')
         return nil unless id.positive?
@@ -21,7 +23,7 @@ module Main
           if (i = @indices[uri])
             pool.delete_at(i)
           end
-          pool.insert(0, uri)
+          pool.unshift(uri)
           changes += flush(pool)
         end
         publish(changes)
@@ -30,7 +32,7 @@ module Main
       def hook(uri, hook)
         return unless hook.respond_to?(:context_updated)
 
-        @hooks[hook] = uri
+        @hooks[hook].add(uri)
         @indices[uri] + 1
       end
 
@@ -52,8 +54,8 @@ module Main
       end
 
       def publish(changes)
-        @hooks.each do |hook, uri|
-          hook.context_updated if changes.include?(uri)
+        @hooks.each do |hook, uris|
+          hook.context_updated if changes.intersect?(uris)
         end
       end
     end

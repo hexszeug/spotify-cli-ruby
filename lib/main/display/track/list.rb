@@ -10,7 +10,7 @@ module Main
           tracks,
           title: nil,
           context: nil,
-          index: true,
+          index: :index,
           artists: true,
           album: true,
           &update
@@ -105,7 +105,8 @@ module Main
           table = Display::Table.new(*columns, gap: 2)
           @tracks.each_with_index do |track, i|
             row = []
-            row.push((i + 1).to_s) if @index
+            row.push((i + 1).to_s) if @index == :index
+            row.push(track[:track_number].to_s) if @index == :track_number
             row.push(track(track))
             row.push(artists(track[:artists])) if @artists
             row.push(album(track[:album])) if @album

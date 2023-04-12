@@ -22,9 +22,17 @@ module Main
 
       private
 
-      def album(_uri)
-        album = JSON.parse(File.read('test_album.json'), symbolize_names: true)
-        print(album, type: Display::Album::Details)
+      def album(uri)
+        screen_message = print('Loading.$~.')
+        album_id = uri.split(':').last
+        Spotify::API::Albums.get_album(id: album_id) do |album|
+          album[:tracks] =
+            Spotify::API::Albums.get_album_tracks(
+              album_id:,
+              pagination: Spotify::API::Pagination.new
+            )[:items]
+          screen_message.replace(album, type: Display::Album::Details)
+        end
       end
     end
   end
